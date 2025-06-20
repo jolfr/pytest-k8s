@@ -60,32 +60,38 @@ class TestKindClusterExceptions:
             assert str(error) == test_message
     
     def test_error_creation_without_message(self):
-        """Test error creation without message."""
+        """Test error creation with empty message."""
         errors = [
-            KindClusterError(),
-            KindClusterCreationError(),
-            KindClusterDeletionError(),
-            KindClusterNotFoundError(),
+            KindClusterError(""),
+            KindClusterCreationError(""),
+            KindClusterDeletionError(""),
+            KindClusterNotFoundError(""),
         ]
         
         for error in errors:
             assert str(error) == ""
     
     def test_error_with_exception_args(self):
-        """Test errors with multiple arguments."""
-        args = ("First arg", "Second arg", 42)
+        """Test errors with message and recovery suggestion."""
+        message = "Test error message"
+        recovery = "Try this recovery step"
         
-        error = KindClusterError(*args)
-        assert error.args == args
+        error = KindClusterError(message, recovery)
+        assert error.message == message
+        assert error.recovery_suggestion == recovery
+        assert recovery in str(error)
         
-        creation_error = KindClusterCreationError(*args)
-        assert creation_error.args == args
+        creation_error = KindClusterCreationError(message, recovery)
+        assert creation_error.message == message
+        assert creation_error.recovery_suggestion == recovery
         
-        deletion_error = KindClusterDeletionError(*args)
-        assert deletion_error.args == args
+        deletion_error = KindClusterDeletionError(message, recovery)
+        assert deletion_error.message == message
+        assert deletion_error.recovery_suggestion == recovery
         
-        not_found_error = KindClusterNotFoundError(*args)
-        assert not_found_error.args == args
+        not_found_error = KindClusterNotFoundError(message, recovery)
+        assert not_found_error.message == message
+        assert not_found_error.recovery_suggestion == recovery
     
     def test_raise_and_catch_errors(self):
         """Test raising and catching errors."""

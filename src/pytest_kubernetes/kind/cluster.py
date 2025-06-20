@@ -11,13 +11,18 @@ import subprocess
 import tempfile
 import time
 import uuid
+import yaml
 from pathlib import Path
 from typing import Dict, List, Optional, Union
 
+from .command_runner import KindCommandRunner, KubectlCommandRunner
+from .config import KindClusterConfig, create_simple_config
 from .errors import (
     KindClusterError,
     KindClusterCreationError,
     KindClusterDeletionError,
+    KindClusterTimeoutError,
+    KindClusterValidationError,
 )
 
 logger = logging.getLogger(__name__)
@@ -34,14 +39,14 @@ class KindCluster:
     Attributes:
         name: The name of the kind cluster
         kubeconfig_path: Path to the kubeconfig file for this cluster
-        config_path: Optional path to kind cluster configuration file
-        timeout: Timeout in seconds for cluster operations
+        config: Cluster configuration
         keep_cluster: Whether to keep the cluster after deletion is requested
     """
     
     def __init__(
         self,
         name: Optional[str] = None,
+        config: Optional[KindClusterConfig] = None,
         config_path: Optional[Union[str, Path]] = None,
         timeout: int = 300,
         keep_cluster: bool = False,
@@ -53,18 +58,53 @@ class KindCluster:
         
         Args:
             name: Name for the cluster. If None, generates a unique name.
+            config: Cluster configuration object.
             config_path: Path to kind cluster configuration file.
             timeout: Timeout in seconds for cluster operations.
             keep_cluster: Whether to keep cluster after deletion is requested.
             image: Kubernetes node image to use.
             extra_port_mappings: Additional port mappings for the cluster.
         """
-        self.name = name or self._generate_cluster_name()
-        self.config_path = Path(config_path) if config_path else None
-        self.timeout = timeout
+        # Handle configuration
+        if config:
+            self.config = config
+            if name:
+                self.config.name = name
+        elif config_path:
+            # Load configuration from file
+            with open(config_path, 'r') as f:
+                config_data = yaml.safe_load(f)
+            self.config = KindClusterConfig.from_dict(config_data)
+            if name:
+                self.config.name = name
+        else:
+            # Create simple configuration from parameters
+            port_mappings_list = None
+            if extra_port_mappings:
+                port_mappings_list = [
+                    {
+                        "containerPort": mapping["containerPort"],
+                        "hostPort": mapping["hostPort"],
+                        "protocol": mapping.get("protocol", "TCP"),
+                        "listenAddress": mapping.get("listenAddress", "0.0.0.0")
+                    }
+                    for mapping in extra_port_mappings
+                ]
+            
+            self.config = create_simple_config(
+                name=name,
+                image=image,
+                port_mappings=port_mappings_list
+            )
+        
+        self.config.timeout = timeout
+        self.config.keep_cluster = keep_cluster
+        self.name = self.config.name or self._generate_cluster_name()
         self.keep_cluster = keep_cluster
-        self.image = image
-        self.extra_port_mappings = extra_port_mappings or []
+        
+        # Initialize command runners
+        self._kind_runner = KindCommandRunner(default_timeout=timeout)
+        self._kubectl_runner: Optional[KubectlCommandRunner] = None
         
         # Initialize kubeconfig path
         self._kubeconfig_path: Optional[Path] = None
@@ -107,7 +147,7 @@ class KindCluster:
             subprocess.CalledProcessError: If command fails and check=True.
             subprocess.TimeoutExpired: If command times out.
         """
-        timeout = timeout or self.timeout
+        timeout = timeout or self.config.timeout
         
         logger.debug(f"Running command: {' '.join(cmd)}")
         
@@ -155,54 +195,37 @@ class KindCluster:
     
     def _create_cluster_config(self) -> Optional[Path]:
         """
-        Create a temporary cluster configuration file if needed.
+        Create a temporary cluster configuration file from the config object.
         
         Returns:
-            Path to the configuration file or None.
+            Path to the configuration file or None if default config should be used.
         """
-        if self.config_path:
-            return self.config_path
+        # If we only have a single control-plane node with default settings, use kind's defaults
+        if (self.config.total_nodes == 1 and 
+            self.config.control_plane_count == 1 and 
+            not self.config.image and 
+            not any(node.extra_port_mappings for node in self.config.nodes) and
+            not self.config.networking and 
+            not self.config.feature_gates and
+            not self.config.runtime_config):
+            return None
         
-        # Create default config if we have custom settings
-        if self.extra_port_mappings or self.image:
-            config_content = self._generate_default_config()
-            
-            # Create temporary config file
-            temp_config = tempfile.NamedTemporaryFile(
-                mode='w',
-                suffix='.yaml',
-                prefix='kind-config-',
-                delete=False
-            )
-            temp_config.write(config_content)
-            temp_config.flush()
-            temp_config.close()
-            
-            return Path(temp_config.name)
+        # Generate configuration YAML
+        config_dict = self.config.to_yaml_dict()
+        config_content = yaml.dump(config_dict, default_flow_style=False)
         
-        return None
-    
-    def _generate_default_config(self) -> str:
-        """Generate a default kind cluster configuration."""
-        config_lines = [
-            "kind: Cluster",
-            "apiVersion: kind.x-k8s.io/v1alpha4",
-            "nodes:",
-            "- role: control-plane"
-        ]
+        # Create temporary config file
+        temp_config = tempfile.NamedTemporaryFile(
+            mode='w',
+            suffix='.yaml',
+            prefix='kind-config-',
+            delete=False
+        )
+        temp_config.write(config_content)
+        temp_config.flush()
+        temp_config.close()
         
-        if self.image:
-            config_lines.append(f"  image: {self.image}")
-        
-        if self.extra_port_mappings:
-            config_lines.append("  extraPortMappings:")
-            for mapping in self.extra_port_mappings:
-                config_lines.append(f"  - containerPort: {mapping['containerPort']}")
-                config_lines.append(f"    hostPort: {mapping['hostPort']}")
-                if 'protocol' in mapping:
-                    config_lines.append(f"    protocol: {mapping['protocol']}")
-        
-        return "\n".join(config_lines)
+        return Path(temp_config.name)
     
     def _setup_kubeconfig(self) -> None:
         """Set up kubeconfig for the cluster."""
@@ -243,12 +266,11 @@ class KindCluster:
             logger.warning(f"Cluster {self.name} already created")
             return
         
-        # Check prerequisites
-        if not self._check_kind_available():
-            raise KindClusterError("kind command not available")
-        
-        if not self._check_docker_available():
-            raise KindClusterError("Docker not available or not running")
+        # Check prerequisites using command runner
+        try:
+            self._kind_runner.validate_prerequisites()
+        except Exception as e:
+            raise KindClusterError(str(e))
         
         logger.info(f"Creating kind cluster: {self.name}")
         
@@ -258,49 +280,47 @@ class KindCluster:
                 f"Cluster {self.name} already exists"
             )
         
-        # Prepare creation command
-        cmd = ["kind", "create", "cluster", "--name", self.name]
-        
-        # Add configuration file if provided
+        # Create temporary config file if needed
         config_path = self._create_cluster_config()
-        if config_path:
-            cmd.extend(["--config", str(config_path)])
-        
-        # Add wait flag
-        cmd.append("--wait=60s")
         
         try:
-            # Create the cluster
-            self._run_command(cmd, timeout=self.timeout)
+            # Create the cluster using command runner
+            self._kind_runner.create_cluster(
+                name=self.name,
+                config_path=str(config_path) if config_path else None,
+                wait_timeout=60,
+                timeout=self.config.timeout
+            )
             self._created = True
             
             # Set up kubeconfig
             self._setup_kubeconfig()
+            
+            # Initialize kubectl runner
+            self._kubectl_runner = KubectlCommandRunner(
+                kubeconfig_path=str(self._kubeconfig_path),
+                default_timeout=30
+            )
             
             # Verify cluster is ready
             self.wait_for_ready()
             
             logger.info(f"Kind cluster {self.name} created successfully")
             
-        except subprocess.CalledProcessError as e:
-            # Clean up on failure
-            try:
-                self.delete()
-            except Exception:
-                pass  # Ignore cleanup errors
-            raise KindClusterCreationError(
-                f"Failed to create cluster {self.name}: {e.stderr}"
-            )
         except Exception as e:
             # Clean up on failure
             try:
                 self.delete()
             except Exception:
                 pass  # Ignore cleanup errors
-            raise KindClusterCreationError(f"Cluster creation failed: {str(e)}")
+            
+            if isinstance(e, (subprocess.CalledProcessError, KindClusterError)):
+                raise KindClusterCreationError(f"Failed to create cluster {self.name}: {e}")
+            else:
+                raise KindClusterCreationError(f"Cluster creation failed: {str(e)}")
         finally:
             # Clean up temporary config file
-            if config_path and config_path != self.config_path:
+            if config_path and config_path.exists():
                 try:
                     config_path.unlink()
                 except Exception:
@@ -380,7 +400,7 @@ class KindCluster:
         Raises:
             KindClusterError: If cluster is not ready within timeout.
         """
-        timeout = timeout or self.timeout
+        timeout = timeout or self.config.timeout
         start_time = time.time()
         
         logger.info(f"Waiting for cluster {self.name} to be ready...")
