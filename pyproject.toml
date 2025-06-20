@@ -1,7 +1,7 @@
 [project]
 name = "pytest-kubernetes"
 version = "0.1.0"
-description = "Add your description here"
+description = "Kubernetes-based testing for pytest"
 readme = "README.md"
 authors = [
     { name = "Thomas Jack Carroll", email = "thomas.jack.carroll@gmail.com" }
