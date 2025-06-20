@@ -60,12 +60,12 @@ class TestKindClusterExceptions:
             assert str(error) == test_message
     
     def test_error_creation_without_message(self):
-        """Test error creation with empty message."""
+        """Test error creation with no message."""
         errors = [
-            KindClusterError(""),
-            KindClusterCreationError(""),
-            KindClusterDeletionError(""),
-            KindClusterNotFoundError(""),
+            KindClusterError(),
+            KindClusterCreationError(),
+            KindClusterDeletionError(),
+            KindClusterNotFoundError(),
         ]
         
         for error in errors:
