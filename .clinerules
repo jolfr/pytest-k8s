@@ -1,0 +1,12 @@
+## Documentation Requirements
+
+-   Update relevant documentation in folder README.md when modifying features
+-   Keep root README.md in sync with new capabilities
+-   Maintain changelog entries in CHANGELOG.md
+-   Enforce docstrings for each class and function
+
+## Testing Requirements
+
+-   Write both unit and intgration tests
+-   Test error handling and edge cases
+-   Run tests with ```uv run pytest```
