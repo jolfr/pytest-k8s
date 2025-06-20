@@ -1,8 +1,8 @@
 """
 Tests for the kind cluster lifecycle manager.
 
-This module contains comprehensive tests for KindCluster and KindClusterManager
-classes, including unit tests with mocking and integration tests.
+This module contains comprehensive tests for the KindCluster class,
+including unit tests with mocking and integration tests.
 """
 
 import os
@@ -14,13 +14,11 @@ from unittest.mock import MagicMock, Mock, call, mock_open, patch
 
 import pytest
 
-from pytest_kubernetes.kind.cluster import (
-    KindCluster,
+from pytest_kubernetes.kind.cluster import KindCluster
+from pytest_kubernetes.kind.errors import (
     KindClusterError,
     KindClusterCreationError,
     KindClusterDeletionError,
-    KindClusterManager,
-    KindClusterNotFoundError,
 )
 
 
@@ -569,196 +567,6 @@ class TestKindCluster:
         assert repr(cluster) == expected
 
 
-class TestKindClusterManager:
-    """Test cases for KindClusterManager class."""
-    
-    def test_init(self):
-        """Test KindClusterManager initialization."""
-        manager = KindClusterManager()
-        
-        assert len(manager._clusters) == 0
-        assert manager._default_config == {
-            'timeout': 300,
-            'keep_cluster': False,
-            'image': None,
-        }
-    
-    @patch.object(KindCluster, 'create')
-    def test_create_cluster_success(self, mock_create):
-        """Test successful cluster creation through manager."""
-        manager = KindClusterManager()
-        
-        cluster = manager.create_cluster(name="test-cluster", timeout=600)
-        
-        assert cluster.name == "test-cluster"
-        assert cluster.timeout == 600
-        assert manager._clusters["test-cluster"] is cluster
-        mock_create.assert_called_once()
-    
-    @patch.object(KindCluster, 'create')
-    def test_create_cluster_auto_name(self, mock_create):
-        """Test cluster creation with auto-generated name."""
-        manager = KindClusterManager()
-        
-        cluster = manager.create_cluster()
-        
-        assert cluster.name.startswith("pytest-k8s-")
-        assert manager._clusters[cluster.name] is cluster
-        mock_create.assert_called_once()
-    
-    @patch.object(KindCluster, 'create')
-    def test_create_cluster_with_config_path(self, mock_create):
-        """Test cluster creation with config path."""
-        manager = KindClusterManager()
-        config_path = "/tmp/kind-config.yaml"
-        
-        cluster = manager.create_cluster(
-            name="test-cluster",
-            config_path=config_path,
-            image="kindest/node:v1.25.0"
-        )
-        
-        assert cluster.name == "test-cluster"
-        assert str(cluster.config_path) == config_path
-        assert cluster.image == "kindest/node:v1.25.0"
-        mock_create.assert_called_once()
-    
-    def test_get_cluster_exists(self):
-        """Test getting an existing cluster."""
-        manager = KindClusterManager()
-        cluster = KindCluster(name="test-cluster")
-        manager._clusters["test-cluster"] = cluster
-        
-        result = manager.get_cluster("test-cluster")
-        assert result is cluster
-    
-    def test_get_cluster_not_exists(self):
-        """Test getting a non-existent cluster."""
-        manager = KindClusterManager()
-        
-        result = manager.get_cluster("nonexistent")
-        assert result is None
-    
-    @patch.object(KindCluster, 'delete')
-    def test_delete_cluster_success(self, mock_delete):
-        """Test successful cluster deletion through manager."""
-        manager = KindClusterManager()
-        cluster = KindCluster(name="test-cluster")
-        manager._clusters["test-cluster"] = cluster
-        
-        manager.delete_cluster("test-cluster")
-        
-        mock_delete.assert_called_once()
-        assert "test-cluster" not in manager._clusters
-    
-    def test_delete_cluster_not_found(self):
-        """Test deleting a non-existent cluster."""
-        manager = KindClusterManager()
-        
-        with pytest.raises(KindClusterNotFoundError, match="not found"):
-            manager.delete_cluster("nonexistent")
-    
-    def test_list_clusters_empty(self):
-        """Test listing clusters when none exist."""
-        manager = KindClusterManager()
-        
-        clusters = manager.list_clusters()
-        assert clusters == []
-    
-    def test_list_clusters_with_clusters(self):
-        """Test listing clusters when some exist."""
-        manager = KindClusterManager()
-        cluster1 = KindCluster(name="cluster1")
-        cluster2 = KindCluster(name="cluster2")
-        manager._clusters["cluster1"] = cluster1
-        manager._clusters["cluster2"] = cluster2
-        
-        clusters = manager.list_clusters()
-        assert set(clusters) == {"cluster1", "cluster2"}
-    
-    @patch.object(KindCluster, 'delete')
-    def test_cleanup_all_success(self, mock_delete):
-        """Test successful cleanup of all clusters."""
-        manager = KindClusterManager()
-        cluster1 = KindCluster(name="cluster1")
-        cluster2 = KindCluster(name="cluster2")
-        manager._clusters["cluster1"] = cluster1
-        manager._clusters["cluster2"] = cluster2
-        
-        manager.cleanup_all()
-        
-        assert len(manager._clusters) == 0
-        assert mock_delete.call_count == 2
-    
-    @patch.object(KindCluster, 'delete')
-    def test_cleanup_all_with_errors(self, mock_delete):
-        """Test cleanup with some clusters failing to delete."""
-        mock_delete.side_effect = [Exception("Delete failed"), None]
-        
-        manager = KindClusterManager()
-        cluster1 = KindCluster(name="cluster1")
-        cluster2 = KindCluster(name="cluster2")
-        manager._clusters["cluster1"] = cluster1
-        manager._clusters["cluster2"] = cluster2
-        
-        # Should not raise exception, just log errors
-        manager.cleanup_all()
-        
-        assert len(manager._clusters) == 0
-        assert mock_delete.call_count == 2
-    
-    def test_len(self):
-        """Test length operator."""
-        manager = KindClusterManager()
-        assert len(manager) == 0
-        
-        cluster = KindCluster(name="test-cluster")
-        manager._clusters["test-cluster"] = cluster
-        assert len(manager) == 1
-    
-    def test_iter(self):
-        """Test iteration over clusters."""
-        manager = KindClusterManager()
-        cluster1 = KindCluster(name="cluster1")
-        cluster2 = KindCluster(name="cluster2")
-        manager._clusters["cluster1"] = cluster1
-        manager._clusters["cluster2"] = cluster2
-        
-        clusters = list(manager)
-        assert len(clusters) == 2
-        assert cluster1 in clusters
-        assert cluster2 in clusters
-
-
-class TestKindClusterExceptions:
-    """Test cases for exception classes."""
-    
-    def test_kind_cluster_error_inheritance(self):
-        """Test KindClusterError inheritance."""
-        error = KindClusterError("Test error")
-        assert isinstance(error, Exception)
-        assert str(error) == "Test error"
-    
-    def test_kind_cluster_creation_error_inheritance(self):
-        """Test KindClusterCreationError inheritance."""
-        error = KindClusterCreationError("Creation failed")
-        assert isinstance(error, KindClusterError)
-        assert isinstance(error, Exception)
-        assert str(error) == "Creation failed"
-    
-    def test_kind_cluster_deletion_error_inheritance(self):
-        """Test KindClusterDeletionError inheritance."""
-        error = KindClusterDeletionError("Deletion failed")
-        assert isinstance(error, KindClusterError)
-        assert isinstance(error, Exception)
-        assert str(error) == "Deletion failed"
-    
-    def test_kind_cluster_not_found_error_inheritance(self):
-        """Test KindClusterNotFoundError inheritance."""
-        error = KindClusterNotFoundError("Cluster not found")
-        assert isinstance(error, KindClusterError)
-        assert isinstance(error, Exception)
-        assert str(error) == "Cluster not found"
 
 
 class TestKindClusterIntegration:
@@ -882,34 +690,6 @@ nodes:
             except Exception:
                 pass
     
-    def test_manager_integration(self, skip_if_no_kind, integration_cluster_name):
-        """Test KindClusterManager integration."""
-        manager = KindClusterManager()
-        
-        try:
-            # Create cluster through manager
-            cluster = manager.create_cluster(
-                name=integration_cluster_name,
-                timeout=600
-            )
-            
-            assert cluster.name == integration_cluster_name
-            assert cluster.exists()
-            assert cluster.is_ready()
-            
-            # Verify manager tracking
-            assert len(manager) == 1
-            assert integration_cluster_name in manager.list_clusters()
-            assert manager.get_cluster(integration_cluster_name) is cluster
-            
-            # Delete through manager
-            manager.delete_cluster(integration_cluster_name)
-            assert not cluster.exists()
-            assert len(manager) == 0
-            
-        finally:
-            # Cleanup any remaining clusters
-            manager.cleanup_all()
 
 
 class TestKindClusterErrorHandling:
@@ -1124,41 +904,3 @@ class TestKindClusterEdgeCases:
         
         cluster = KindCluster(name="test-cluster")
         assert cluster.exists() is True
-    
-    def test_manager_edge_cases(self):
-        """Test KindClusterManager edge cases."""
-        manager = KindClusterManager()
-        
-        # Test iteration over empty manager
-        clusters = list(manager)
-        assert clusters == []
-        
-        # Test length of empty manager
-        assert len(manager) == 0
-        
-        # Test list_clusters on empty manager
-        assert manager.list_clusters() == []
-        
-        # Test cleanup_all on empty manager
-        manager.cleanup_all()  # Should not raise
-        assert len(manager) == 0
-    
-    @patch.object(KindCluster, 'create')
-    def test_manager_create_cluster_with_kwargs(self, mock_create):
-        """Test manager create_cluster with various kwargs."""
-        manager = KindClusterManager()
-        
-        cluster = manager.create_cluster(
-            name="test-cluster",
-            timeout=600,
-            keep_cluster=True,
-            image="custom-image",
-            extra_port_mappings=[{"containerPort": 80, "hostPort": 8080}],
-            custom_arg="custom_value"  # Should be passed through
-        )
-        
-        assert cluster.name == "test-cluster"
-        assert cluster.timeout == 600
-        assert cluster.keep_cluster is True
-        assert cluster.image == "custom-image"
-        mock_create.assert_called_once()
