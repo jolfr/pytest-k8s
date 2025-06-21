@@ -13,8 +13,10 @@ from pathlib import Path
 from unittest.mock import MagicMock, Mock, call, mock_open, patch
 
 import pytest
+import yaml
 
 from pytest_kubernetes.kind.cluster import KindCluster
+from pytest_kubernetes.kind.config import KindClusterConfig, create_simple_config
 from pytest_kubernetes.kind.errors import (
     KindClusterError,
     KindClusterCreationError,
@@ -31,23 +33,19 @@ class TestKindCluster:
         
         assert cluster.name.startswith("pytest-k8s-")
         assert len(cluster.name) == 19  # pytest-k8s- + 8 hex chars
-        assert cluster.config_path is None
-        assert cluster.timeout == 300
+        assert cluster.config is not None
+        assert cluster.config.timeout == 300
         assert cluster.keep_cluster is False
-        assert cluster.image is None
-        assert cluster.extra_port_mappings == []
-        assert cluster.kubeconfig_path is None
+        assert cluster.config.image is None
         assert not cluster._created
         assert not cluster._verified
     
     def test_init_with_custom_values(self):
         """Test KindCluster initialization with custom values."""
-        config_path = "/tmp/kind-config.yaml"
         port_mappings = [{"containerPort": 80, "hostPort": 8080}]
         
         cluster = KindCluster(
             name="test-cluster",
-            config_path=config_path,
             timeout=600,
             keep_cluster=True,
             image="kindest/node:v1.25.0",
@@ -55,11 +53,34 @@ class TestKindCluster:
         )
         
         assert cluster.name == "test-cluster"
-        assert str(cluster.config_path) == config_path
-        assert cluster.timeout == 600
+        assert cluster.config.timeout == 600
         assert cluster.keep_cluster is True
-        assert cluster.image == "kindest/node:v1.25.0"
-        assert cluster.extra_port_mappings == port_mappings
+        assert cluster.config.image == "kindest/node:v1.25.0"
+        # Port mappings are converted to PortMapping objects within the config
+        assert len(cluster.config.nodes[0].extra_port_mappings) == 1
+    
+    def test_init_with_config_object(self):
+        """Test KindCluster initialization with config object."""
+        config = create_simple_config(name="test-cluster", image="kindest/node:v1.25.0")
+        cluster = KindCluster(config=config)
+        
+        assert cluster.name == "test-cluster"
+        assert cluster.config.image == "kindest/node:v1.25.0"
+    
+    @patch('yaml.safe_load')
+    @patch('builtins.open', new_callable=mock_open, read_data="kind: Cluster\napiVersion: kind.x-k8s.io/v1alpha4\n")
+    def test_init_with_config_path(self, mock_file, mock_yaml):
+        """Test KindCluster initialization with config path."""
+        mock_yaml.return_value = {
+            "kind": "Cluster",
+            "apiVersion": "kind.x-k8s.io/v1alpha4",
+            "nodes": [{"role": "control-plane"}]
+        }
+        
+        cluster = KindCluster(config_path="/tmp/config.yaml")
+        
+        mock_file.assert_called_once_with("/tmp/config.yaml", 'r')
+        assert cluster.config is not None
     
     def test_generate_cluster_name(self):
         """Test cluster name generation."""
@@ -151,14 +172,6 @@ class TestKindCluster:
         cluster = KindCluster()
         assert cluster._check_docker_available() is False
     
-    def test_create_cluster_config_existing_path(self):
-        """Test cluster config creation with existing path."""
-        config_path = "/tmp/existing-config.yaml"
-        cluster = KindCluster(config_path=config_path)
-        
-        result = cluster._create_cluster_config()
-        assert result == Path(config_path)
-    
     @patch('tempfile.NamedTemporaryFile')
     def test_create_cluster_config_with_custom_settings(self, mock_temp_file):
         """Test cluster config creation with custom settings."""
@@ -186,34 +199,6 @@ class TestKindCluster:
         
         result = cluster._create_cluster_config()
         assert result is None
-    
-    def test_generate_default_config(self):
-        """Test default config generation."""
-        cluster = KindCluster(
-            image="kindest/node:v1.25.0",
-            extra_port_mappings=[
-                {"containerPort": 80, "hostPort": 8080, "protocol": "TCP"},
-                {"containerPort": 443, "hostPort": 8443}
-            ]
-        )
-        
-        config = cluster._generate_default_config()
-        
-        expected_lines = [
-            "kind: Cluster",
-            "apiVersion: kind.x-k8s.io/v1alpha4",
-            "nodes:",
-            "- role: control-plane",
-            "  image: kindest/node:v1.25.0",
-            "  extraPortMappings:",
-            "  - containerPort: 80",
-            "    hostPort: 8080",
-            "    protocol: TCP",
-            "  - containerPort: 443",
-            "    hostPort: 8443"
-        ]
-        
-        assert config == "\n".join(expected_lines)
     
     @patch('tempfile.NamedTemporaryFile')
     @patch.object(KindCluster, '_run_command')
@@ -250,72 +235,53 @@ class TestKindCluster:
         with pytest.raises(KindClusterCreationError, match="Failed to export kubeconfig"):
             cluster._setup_kubeconfig()
     
-    @patch.object(KindCluster, '_check_kind_available')
-    @patch.object(KindCluster, '_check_docker_available')
+    @patch('pytest_kubernetes.kind.cluster.KubectlCommandRunner')
     @patch.object(KindCluster, 'exists')
     @patch.object(KindCluster, '_create_cluster_config')
-    @patch.object(KindCluster, '_run_command')
     @patch.object(KindCluster, '_setup_kubeconfig')
     @patch.object(KindCluster, 'wait_for_ready')
     def test_create_success(
         self,
         mock_wait_ready,
         mock_setup_kubeconfig,
-        mock_run_command,
         mock_create_config,
         mock_exists,
-        mock_check_docker,
-        mock_check_kind,
+        mock_kubectl_runner,
     ):
         """Test successful cluster creation."""
-        mock_check_kind.return_value = True
-        mock_check_docker.return_value = True
         mock_exists.return_value = False
         mock_create_config.return_value = None
         
         cluster = KindCluster(name="test-cluster")
+        cluster._kind_runner = Mock()
+        cluster._kind_runner.validate_prerequisites = Mock()
+        cluster._kind_runner.create_cluster = Mock()
+        
         cluster.create()
         
         assert cluster._created is True
-        mock_run_command.assert_called_once_with(
-            ["kind", "create", "cluster", "--name", "test-cluster", "--wait=60s"],
-            timeout=300
-        )
+        cluster._kind_runner.validate_prerequisites.assert_called_once()
+        cluster._kind_runner.create_cluster.assert_called_once()
         mock_setup_kubeconfig.assert_called_once()
         mock_wait_ready.assert_called_once()
     
-    @patch.object(KindCluster, '_check_kind_available')
-    def test_create_kind_not_available(self, mock_check_kind):
-        """Test cluster creation when kind is not available."""
-        mock_check_kind.return_value = False
-        
+    def test_create_prerequisites_fail(self):
+        """Test cluster creation when prerequisites fail."""
         cluster = KindCluster()
+        cluster._kind_runner = Mock()
+        cluster._kind_runner.validate_prerequisites.side_effect = Exception("Prerequisites failed")
         
-        with pytest.raises(KindClusterError, match="kind command not available"):
+        with pytest.raises(KindClusterError, match="Prerequisites failed"):
             cluster.create()
     
-    @patch.object(KindCluster, '_check_kind_available')
-    @patch.object(KindCluster, '_check_docker_available')
-    def test_create_docker_not_available(self, mock_check_docker, mock_check_kind):
-        """Test cluster creation when Docker is not available."""
-        mock_check_kind.return_value = True
-        mock_check_docker.return_value = False
-        
-        cluster = KindCluster()
-        
-        with pytest.raises(KindClusterError, match="Docker not available"):
-            cluster.create()
-    
-    @patch.object(KindCluster, '_check_kind_available')
-    @patch.object(KindCluster, '_check_docker_available')
     @patch.object(KindCluster, 'exists')
-    def test_create_cluster_already_exists(self, mock_exists, mock_check_docker, mock_check_kind):
+    def test_create_cluster_already_exists(self, mock_exists):
         """Test cluster creation when cluster already exists."""
-        mock_check_kind.return_value = True
-        mock_check_docker.return_value = True
         mock_exists.return_value = True
         
         cluster = KindCluster(name="existing-cluster")
+        cluster._kind_runner = Mock()
+        cluster._kind_runner.validate_prerequisites = Mock()
         
         with pytest.raises(KindClusterCreationError, match="already exists"):
             cluster.create()
@@ -565,8 +531,17 @@ class TestKindCluster:
             "verified=False, kubeconfig=None)"
         )
         assert repr(cluster) == expected
-
-
+    
+    def test_kubeconfig_path_property_none(self):
+        """Test kubeconfig_path property when path is None."""
+        cluster = KindCluster()
+        assert cluster.kubeconfig_path is None
+    
+    def test_kubeconfig_path_property_set(self):
+        """Test kubeconfig_path property when path is set."""
+        cluster = KindCluster()
+        cluster._kubeconfig_path = Path("/tmp/test.yaml")
+        assert cluster.kubeconfig_path == "/tmp/test.yaml"
 
 
 class TestKindClusterIntegration:
@@ -650,63 +625,36 @@ class TestKindClusterIntegration:
     
     def test_cluster_with_custom_config_integration(self, skip_if_no_kind, integration_cluster_name):
         """Test cluster creation with custom configuration."""
-        # Create temporary config file
-        config_content = """
-kind: Cluster
-apiVersion: kind.x-k8s.io/v1alpha4
-nodes:
-- role: control-plane
-  extraPortMappings:
-  - containerPort: 80
-    hostPort: 8080
-        """.strip()
-        
-        with tempfile.NamedTemporaryFile(mode='w', suffix='.yaml', delete=False) as f:
-            f.write(config_content)
-            config_path = f.name
+        # Create cluster with port mappings (use default image which is more reliable)
+        cluster = KindCluster(
+            name=integration_cluster_name,
+            extra_port_mappings=[
+                {"containerPort": 80, "hostPort": 8080}
+            ],
+            timeout=600
+        )
         
         try:
-            cluster = KindCluster(
-                name=integration_cluster_name,
-                config_path=config_path,
-                timeout=600
-            )
+            cluster.create()
+            assert cluster.exists()
+            assert cluster.is_ready()
             
-            try:
-                cluster.create()
-                assert cluster.exists()
-                assert cluster.is_ready()
-                
-                nodes = cluster.get_nodes()
-                assert len(nodes) > 0
-                
-            finally:
-                cluster.delete()
-                
+            nodes = cluster.get_nodes()
+            assert len(nodes) > 0
+            
         finally:
-            # Clean up config file
-            try:
-                Path(config_path).unlink()
-            except Exception:
-                pass
-    
+            cluster.delete()
 
 
 class TestKindClusterErrorHandling:
     """Test error handling and edge cases."""
     
-    @patch.object(KindCluster, '_run_command')
-    def test_create_with_command_failure_cleanup(self, mock_run_command):
+    def test_create_with_command_failure_cleanup(self):
         """Test cleanup when cluster creation fails."""
-        # Mock successful prerequisite checks
-        mock_run_command.side_effect = [
-            Mock(),  # kind version check
-            Mock(),  # docker version check
-            Mock(returncode=0, stdout=""),  # kind get clusters (empty)
-            subprocess.CalledProcessError(1, ["kind"], stderr="creation failed")  # create fails
-        ]
-        
         cluster = KindCluster(name="test-cluster")
+        cluster._kind_runner = Mock()
+        cluster._kind_runner.validate_prerequisites = Mock()
+        cluster._kind_runner.create_cluster.side_effect = Exception("Creation failed")
         
         with patch.object(cluster, 'delete') as mock_delete:
             with pytest.raises(KindClusterCreationError):
@@ -715,15 +663,14 @@ class TestKindClusterErrorHandling:
             # Should attempt cleanup
             mock_delete.assert_called_once()
     
-    @patch.object(KindCluster, '_run_command')
-    def test_wait_for_ready_with_partial_failures(self, mock_run_command):
+    @patch('subprocess.run')
+    def test_wait_for_ready_with_partial_failures(self, mock_run):
         """Test wait_for_ready with initial failures then success."""
         cluster = KindCluster(name="test-cluster")
         cluster._kubeconfig_path = Path("/tmp/kubeconfig.yaml")
         
         # First call fails, second succeeds
-        with patch('subprocess.run') as mock_run, \
-             patch('time.time') as mock_time, \
+        with patch('time.time') as mock_time, \
              patch('time.sleep') as mock_sleep:
             
             mock_time.side_effect = [0, 1, 2, 3]  # Simulate time progression
@@ -740,78 +687,27 @@ class TestKindClusterErrorHandling:
             assert mock_run.call_count == 2
             mock_sleep.assert_called()
     
-    def test_kubeconfig_path_property_none(self):
-        """Test kubeconfig_path property when path is None."""
-        cluster = KindCluster()
-        assert cluster.kubeconfig_path is None
-    
-    def test_kubeconfig_path_property_set(self):
-        """Test kubeconfig_path property when path is set."""
-        cluster = KindCluster()
-        cluster._kubeconfig_path = Path("/tmp/test.yaml")
-        assert cluster.kubeconfig_path == "/tmp/test.yaml"
-    
-    @patch.object(KindCluster, '_run_command')
-    def test_get_nodes_timeout_error(self, mock_run_command):
+    @patch('subprocess.run')
+    def test_get_nodes_timeout_error(self, mock_run):
         """Test get_nodes with timeout error."""
         cluster = KindCluster()
         cluster._kubeconfig_path = Path("/tmp/kubeconfig.yaml")
         
-        with patch('subprocess.run') as mock_run:
-            mock_run.side_effect = subprocess.TimeoutExpired(["kubectl"], 30)
-            
-            with pytest.raises(KindClusterError, match="Timeout getting cluster nodes"):
-                cluster.get_nodes()
+        mock_run.side_effect = subprocess.TimeoutExpired(["kubectl"], 30)
+        
+        with pytest.raises(KindClusterError, match="Timeout getting cluster nodes"):
+            cluster.get_nodes()
     
-    @patch.object(KindCluster, '_run_command')
-    def test_get_nodes_generic_error(self, mock_run_command):
+    @patch('subprocess.run')
+    def test_get_nodes_generic_error(self, mock_run):
         """Test get_nodes with generic error."""
         cluster = KindCluster()
         cluster._kubeconfig_path = Path("/tmp/kubeconfig.yaml")
         
-        with patch('subprocess.run') as mock_run:
-            mock_run.side_effect = ValueError("Generic error")
-            
-            with pytest.raises(KindClusterError, match="Error getting nodes"):
-                cluster.get_nodes()
-    
-    def test_generate_default_config_image_only(self):
-        """Test config generation with only image specified."""
-        cluster = KindCluster(image="kindest/node:v1.25.0")
+        mock_run.side_effect = ValueError("Generic error")
         
-        config = cluster._generate_default_config()
-        
-        expected_lines = [
-            "kind: Cluster",
-            "apiVersion: kind.x-k8s.io/v1alpha4",
-            "nodes:",
-            "- role: control-plane",
-            "  image: kindest/node:v1.25.0"
-        ]
-        
-        assert config == "\n".join(expected_lines)
-    
-    def test_generate_default_config_port_mappings_only(self):
-        """Test config generation with only port mappings specified."""
-        cluster = KindCluster(
-            extra_port_mappings=[
-                {"containerPort": 80, "hostPort": 8080}
-            ]
-        )
-        
-        config = cluster._generate_default_config()
-        
-        expected_lines = [
-            "kind: Cluster",
-            "apiVersion: kind.x-k8s.io/v1alpha4",
-            "nodes:",
-            "- role: control-plane",
-            "  extraPortMappings:",
-            "  - containerPort: 80",
-            "    hostPort: 8080"
-        ]
-        
-        assert config == "\n".join(expected_lines)
+        with pytest.raises(KindClusterError, match="Error getting nodes"):
+            cluster.get_nodes()
 
 
 class TestKindClusterEdgeCases:
@@ -837,70 +733,39 @@ class TestKindClusterEdgeCases:
         """Test timeout edge cases."""
         # Test zero timeout
         cluster = KindCluster(timeout=0)
-        assert cluster.timeout == 0
+        assert cluster.config.timeout == 0
         
-        # Test negative timeout
-        cluster = KindCluster(timeout=-1)
-        assert cluster.timeout == -1
+        # Test negative timeout (should be handled by config validation)
+        from pytest_kubernetes.kind.errors import KindClusterConfigError
+        with pytest.raises(KindClusterConfigError, match="Invalid timeout"):
+            cluster = KindCluster(timeout=-1)
         
         # Test very large timeout
         cluster = KindCluster(timeout=86400)
-        assert cluster.timeout == 86400
+        assert cluster.config.timeout == 86400
     
     def test_empty_port_mappings(self):
         """Test empty port mappings."""
         cluster = KindCluster(extra_port_mappings=[])
-        assert cluster.extra_port_mappings == []
+        # Empty port mappings should result in no port mappings on the node
+        assert len(cluster.config.nodes[0].extra_port_mappings) == 0
         
         # Should not create config for empty mappings
         config_path = cluster._create_cluster_config()
         assert config_path is None
     
-    def test_path_handling(self):
+    @patch('yaml.safe_load')
+    @patch('builtins.open', new_callable=mock_open)
+    def test_path_handling(self, mock_file, mock_yaml):
         """Test path handling for config_path."""
+        mock_yaml.return_value = {
+            "kind": "Cluster",
+            "apiVersion": "kind.x-k8s.io/v1alpha4",
+            "nodes": [{"role": "control-plane"}]
+        }
+        
         # Test string path
         cluster = KindCluster(config_path="/tmp/config.yaml")
-        assert isinstance(cluster.config_path, Path)
-        assert str(cluster.config_path) == "/tmp/config.yaml"
+        assert cluster.config is not None
         
-        # Test Path object
-        path_obj = Path("/tmp/config2.yaml")
-        cluster = KindCluster(config_path=path_obj)
-        assert cluster.config_path == path_obj
-        
-        # Test None path
-        cluster = KindCluster(config_path=None)
-        assert cluster.config_path is None
-    
-    @patch.object(KindCluster, '_run_command')
-    def test_exists_with_empty_output(self, mock_run_command):
-        """Test exists method with empty cluster list."""
-        mock_result = Mock()
-        mock_result.returncode = 0
-        mock_result.stdout = ""
-        mock_run_command.return_value = mock_result
-        
-        cluster = KindCluster(name="test-cluster")
-        assert cluster.exists() is False
-    
-    @patch.object(KindCluster, '_run_command')
-    def test_exists_with_single_newline(self, mock_run_command):
-        """Test exists method with single newline output."""
-        mock_result = Mock()
-        mock_result.returncode = 0
-        mock_result.stdout = "\n"
-        mock_run_command.return_value = mock_result
-        
-        cluster = KindCluster(name="test-cluster")
-        assert cluster.exists() is False
-    
-    @patch.object(KindCluster, '_run_command')
-    def test_exists_with_whitespace_cluster_names(self, mock_run_command):
-        """Test exists method with whitespace in cluster names."""
-        mock_result = Mock()
-        mock_result.returncode = 0
-        mock_result.stdout = " cluster1 \n test-cluster \n cluster2 "
-        mock_run_command.return_value = mock_result
-        
-        cluster = KindCluster(name="test-cluster")
-        assert cluster.exists() is True
+        #

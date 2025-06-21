@@ -119,6 +119,13 @@ class KindClusterConfig:
         if not control_plane_nodes:
             raise KindClusterConfigError("At least one control-plane node is required")
     
+    def __setattr__(self, name: str, value) -> None:
+        """Override setattr to validate timeout when it's set."""
+        if name == "timeout" and hasattr(self, "timeout"):  # Only validate after initialization
+            if value < 0:
+                raise KindClusterConfigError(f"Invalid timeout: {value}")
+        super().__setattr__(name, value)
+    
     @property
     def control_plane_count(self) -> int:
         """Get number of control-plane nodes."""

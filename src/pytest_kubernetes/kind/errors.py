@@ -17,7 +17,7 @@ class KindClusterError(Exception):
         recovery_suggestion: Optional suggestion for recovery
     """
     
-    def __init__(self, message: str, recovery_suggestion: Optional[str] = None):
+    def __init__(self, message: str = "", recovery_suggestion: Optional[str] = None):
         super().__init__(message)
         self.message = message
         self.recovery_suggestion = recovery_suggestion
