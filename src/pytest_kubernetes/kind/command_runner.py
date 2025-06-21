@@ -436,7 +436,7 @@ class KubectlCommandRunner(CommandRunner):
         """
         result = self.run_kubectl(["get", "nodes", "-o", "name"], **kwargs)
         nodes = [
-            line.replace('node/', '') 
+            line.replace('node/', '').strip()
             for line in result.stdout.strip().split('\n')
             if line.strip()
         ]
