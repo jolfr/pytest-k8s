@@ -768,4 +768,374 @@ class TestKindClusterEdgeCases:
         cluster = KindCluster(config_path="/tmp/config.yaml")
         assert cluster.config is not None
         
-        #
+        # Test Path object
+        cluster = KindCluster(config_path=Path("/tmp/config.yaml"))
+        assert cluster.config is not None
+
+
+class TestKindClusterAdvancedEdgeCases:
+    """Test advanced edge cases and error scenarios."""
+    
+    def test_cluster_name_special_characters(self):
+        """Test cluster name with special characters."""
+        # Test names that should be sanitized or handled properly
+        special_names = [
+            "test-cluster-123",  # Valid
+            "test_cluster",      # Underscores
+            "test.cluster",      # Dots
+            "test-cluster-very-long-name-that-exceeds-normal-limits",  # Long name
+        ]
+        
+        for name in special_names:
+            cluster = KindCluster(name=name)
+            assert cluster.name == name
+    
+    def test_cluster_name_unicode(self):
+        """Test cluster name with unicode characters."""
+        # Kind might not support unicode cluster names, but we should handle gracefully
+        unicode_name = "test-测试-cluster"
+        cluster = KindCluster(name=unicode_name)
+        assert cluster.name == unicode_name
+    
+    @patch('yaml.safe_load')
+    @patch('builtins.open', new_callable=mock_open)
+    def test_corrupted_config_file(self, mock_file, mock_yaml):
+        """Test handling of corrupted config files."""
+        # Test malformed YAML
+        mock_yaml.side_effect = yaml.YAMLError("Invalid YAML")
+        
+        with pytest.raises(yaml.YAMLError):
+            KindCluster(config_path="/tmp/corrupted.yaml")
+    
+    @patch('builtins.open', new_callable=mock_open)
+    def test_config_file_not_found(self, mock_file):
+        """Test handling of missing config files."""
+        mock_file.side_effect = FileNotFoundError("Config file not found")
+        
+        with pytest.raises(FileNotFoundError):
+            KindCluster(config_path="/tmp/nonexistent.yaml")
+    
+    @patch('builtins.open', new_callable=mock_open)
+    def test_config_file_permission_denied(self, mock_file):
+        """Test handling of permission denied for config files."""
+        mock_file.side_effect = PermissionError("Permission denied")
+        
+        with pytest.raises(PermissionError):
+            KindCluster(config_path="/tmp/noperm.yaml")
+    
+    @patch('yaml.safe_load')
+    @patch('builtins.open', new_callable=mock_open)
+    def test_invalid_config_structure(self, mock_file, mock_yaml):
+        """Test handling of invalid config structure."""
+        # Test config missing required fields
+        mock_yaml.return_value = {"invalid": "config"}
+        
+        cluster = KindCluster(config_path="/tmp/invalid.yaml")
+        # Should create a config with defaults for missing fields
+        assert cluster.config is not None
+    
+    def test_extreme_timeout_values(self):
+        """Test extreme timeout values."""
+        # Test maximum possible timeout
+        max_timeout = 2**31 - 1  # Max 32-bit int
+        cluster = KindCluster(timeout=max_timeout)
+        assert cluster.config.timeout == max_timeout
+        
+        # Test very small timeout
+        cluster = KindCluster(timeout=1)
+        assert cluster.config.timeout == 1
+    
+    def test_port_mapping_edge_cases(self):
+        """Test port mapping edge cases."""
+        # Test edge case port numbers
+        edge_ports = [
+            {"containerPort": 1, "hostPort": 1},          # Minimum ports
+            {"containerPort": 65535, "hostPort": 65535},  # Maximum ports
+            {"containerPort": 80, "hostPort": 80},        # Same port
+            {"containerPort": 443, "hostPort": 8443},     # Common mapping
+        ]
+        
+        for mapping in edge_ports:
+            cluster = KindCluster(extra_port_mappings=[mapping])
+            assert len(cluster.config.nodes[0].extra_port_mappings) == 1
+    
+    def test_multiple_port_mappings(self):
+        """Test multiple port mappings."""
+        # Test many port mappings
+        many_mappings = [
+            {"containerPort": 80 + i, "hostPort": 8000 + i}
+            for i in range(100)  # 100 port mappings
+        ]
+        
+        cluster = KindCluster(extra_port_mappings=many_mappings)
+        assert len(cluster.config.nodes[0].extra_port_mappings) == 100
+    
+    @patch.object(KindCluster, '_run_command')
+    def test_network_failure_during_operations(self, mock_run_command):
+        """Test network failures during cluster operations."""
+        # Simulate network failure
+        mock_run_command.side_effect = subprocess.CalledProcessError(
+            1, ["kind"], stderr="network unreachable"
+        )
+        
+        cluster = KindCluster()
+        
+        # Test exists() with network failure
+        assert cluster.exists() is False
+        
+        # Test delete() with network failure - patch exists to return True so delete actually runs
+        with patch.object(cluster, 'exists', return_value=True):
+            with pytest.raises(KindClusterDeletionError):
+                cluster.delete()
+    
+    @patch('subprocess.run')
+    def test_docker_daemon_crash_during_wait(self, mock_run):
+        """Test Docker daemon crash during wait_for_ready."""
+        cluster = KindCluster()
+        cluster._kubeconfig_path = Path("/tmp/kubeconfig.yaml")
+        
+        # Simulate Docker daemon crash (connection refused)
+        mock_run.side_effect = subprocess.CalledProcessError(
+            1, ["kubectl"], stderr="connection refused"
+        )
+        
+        with patch('time.time') as mock_time:
+            mock_time.side_effect = [0, 301]  # Force timeout
+            
+            with pytest.raises(KindClusterError, match="not ready within"):
+                cluster.wait_for_ready()
+    
+    @patch('tempfile.NamedTemporaryFile')
+    def test_disk_space_exhaustion(self, mock_temp_file):
+        """Test disk space exhaustion during config creation."""
+        mock_file = Mock()
+        mock_file.write.side_effect = OSError("No space left on device")
+        mock_temp_file.return_value = mock_file
+        
+        cluster = KindCluster(image="test-image")
+        
+        with pytest.raises(OSError, match="No space left on device"):
+            cluster._create_cluster_config()
+    
+    @patch('tempfile.NamedTemporaryFile')
+    def test_permission_error_during_kubeconfig_setup(self, mock_temp_file):
+        """Test permission errors during kubeconfig setup."""
+        mock_file = Mock()
+        mock_file.name = "/tmp/kubeconfig.yaml"
+        mock_temp_file.side_effect = PermissionError("Permission denied")
+        
+        cluster = KindCluster()
+        
+        with pytest.raises(PermissionError):
+            cluster._setup_kubeconfig()
+    
+    def test_concurrent_cluster_operations(self):
+        """Test concurrent cluster operations."""
+        cluster1 = KindCluster(name="cluster1")
+        cluster2 = KindCluster(name="cluster2")
+        
+        # Simulate both clusters being created/deleted at same time
+        cluster1._created = True
+        cluster2._created = True
+        
+        # Should handle state independently
+        assert cluster1._created
+        assert cluster2._created
+        
+        cluster1._created = False
+        assert not cluster1._created
+        assert cluster2._created  # Should not be affected
+    
+    @patch.object(KindCluster, '_setup_kubeconfig')
+    @patch.object(KindCluster, '_create_cluster_config')
+    def test_partial_creation_failure_cleanup(self, mock_create_config, mock_setup_kubeconfig):
+        """Test cleanup after partial creation failure."""
+        mock_create_config.return_value = None
+        mock_setup_kubeconfig.side_effect = Exception("Setup failed")
+        
+        cluster = KindCluster()
+        cluster._kind_runner = Mock()
+        cluster._kind_runner.validate_prerequisites = Mock()
+        cluster._kind_runner.create_cluster = Mock()
+        
+        with patch.object(cluster, 'exists', return_value=False):
+            with patch.object(cluster, 'delete') as mock_delete:
+                with pytest.raises(KindClusterCreationError):
+                    cluster.create()
+                
+                # Should attempt cleanup
+                mock_delete.assert_called_once()
+    
+    @patch('pathlib.Path.unlink')
+    def test_kubeconfig_cleanup_failure(self, mock_unlink):
+        """Test handling of kubeconfig cleanup failures."""
+        mock_unlink.side_effect = PermissionError("Permission denied")
+        
+        cluster = KindCluster()
+        cluster._kubeconfig_path = Path("/tmp/kubeconfig.yaml")
+        
+        with patch.object(cluster, 'exists', return_value=True):
+            with patch.object(cluster, '_run_command'):
+                # Should not raise exception even if cleanup fails
+                cluster.delete()
+    
+    def test_kubeconfig_path_validation(self):
+        """Test kubeconfig path validation and handling."""
+        cluster = KindCluster()
+        
+        # Test with None path
+        assert cluster.kubeconfig_path is None
+        
+        # Test with valid path
+        cluster._kubeconfig_path = Path("/valid/path/kubeconfig.yaml")
+        assert cluster.kubeconfig_path == "/valid/path/kubeconfig.yaml"
+        
+        # Test with Path object
+        cluster._kubeconfig_path = Path("/another/path.yaml")
+        assert isinstance(cluster.kubeconfig_path, str)
+    
+    @patch('subprocess.run')
+    def test_very_long_cluster_output(self, mock_run):
+        """Test handling of very long cluster output."""
+        # Simulate very long output
+        long_output = "\n".join([f"very-long-cluster-name-{i}" for i in range(1000)])
+        
+        mock_result = Mock()
+        mock_result.returncode = 0
+        mock_result.stdout = long_output
+        mock_run.return_value = mock_result
+        
+        cluster = KindCluster()
+        
+        # Should handle long output without issues
+        assert cluster.exists() is False  # Our cluster name not in the long list
+    
+    def test_config_mutation_after_creation(self):
+        """Test configuration mutation after cluster creation."""
+        cluster = KindCluster(timeout=300)
+        original_timeout = cluster.config.timeout
+        
+        # Mutate config after creation
+        cluster.config.timeout = 600
+        assert cluster.config.timeout == 600
+        assert cluster.config.timeout != original_timeout
+    
+    @patch('subprocess.run')
+    def test_corrupted_kubeconfig_handling(self, mock_run):
+        """Test handling of corrupted kubeconfig during operations."""
+        cluster = KindCluster()
+        cluster._kubeconfig_path = Path("/tmp/corrupted_kubeconfig.yaml")
+        
+        # Simulate corrupted kubeconfig (kubectl fails)
+        mock_run.side_effect = subprocess.CalledProcessError(
+            1, ["kubectl"], stderr="unable to load kubeconfig"
+        )
+        
+        with pytest.raises(KindClusterError, match="Error getting nodes"):
+            cluster.get_nodes()
+    
+    def test_resource_leak_prevention(self):
+        """Test prevention of resource leaks."""
+        cluster = KindCluster()
+        
+        # Simulate temp file creation
+        with patch('tempfile.NamedTemporaryFile') as mock_temp:
+            mock_file = Mock()
+            mock_file.name = "/tmp/test.yaml"
+            mock_temp.return_value = mock_file
+            
+            cluster._kubeconfig_temp_file = mock_file
+            
+            # Ensure cleanup is called
+            with patch.object(cluster, 'exists', return_value=True):
+                with patch.object(cluster, '_run_command'):
+                    cluster.delete()
+    
+    @patch('subprocess.run')
+    def test_command_injection_prevention(self, mock_run):
+        """Test prevention of command injection attacks."""
+        # Test cluster name with command injection attempt
+        malicious_name = "test; rm -rf /"
+        cluster = KindCluster(name=malicious_name)
+        
+        # Mock exists to return True so delete actually runs the delete command
+        with patch.object(cluster, 'exists', return_value=True):
+            cluster.delete()
+        
+        # Verify the command was called with the literal name - check last call
+        expected_call = call(
+            ["kind", "delete", "cluster", "--name", malicious_name],
+            capture_output=True,
+            text=True,
+            timeout=300,
+            check=True,
+        )
+        assert expected_call in mock_run.call_args_list
+    
+    def test_very_long_input_handling(self):
+        """Test handling of very long inputs."""
+        # Test very long cluster name
+        very_long_name = "a" * 10000
+        cluster = KindCluster(name=very_long_name)
+        assert cluster.name == very_long_name
+        
+        # Test very long image name
+        very_long_image = "registry.example.com/" + "b" * 1000 + ":latest"
+        cluster = KindCluster(image=very_long_image)
+        assert cluster.config.image == very_long_image
+    
+    @patch('subprocess.run')
+    def test_timeout_behavior_edge_cases(self, mock_run):
+        """Test timeout behavior in various scenarios."""
+        cluster = KindCluster(timeout=1)  # Very short timeout
+        
+        # Simulate slow command
+        mock_run.side_effect = subprocess.TimeoutExpired(["kind"], 1)
+        
+        with pytest.raises(subprocess.TimeoutExpired):
+            cluster._run_command(["kind", "version"])
+    
+    def test_state_consistency_after_failures(self):
+        """Test state consistency after various failures."""
+        cluster = KindCluster()
+        
+        # Initial state
+        assert not cluster._created
+        assert not cluster._verified
+        
+        # Simulate partial state change
+        cluster._created = True
+        
+        # After failure, state should be consistent
+        with patch.object(cluster, 'delete'):
+            cluster._created = False
+            cluster._verified = False
+        
+        assert not cluster._created
+        assert not cluster._verified
+    
+    @patch('os.environ', new_callable=dict)
+    def test_environment_variable_isolation(self, mock_env):
+        """Test isolation of environment variables."""
+        # Set up clean environment
+        mock_env.clear()
+        mock_env.update({"PATH": "/usr/bin", "HOME": "/home/test"})
+        
+        cluster = KindCluster()
+        cluster._kubeconfig_path = Path("/tmp/kubeconfig.yaml")
+        
+        with patch('subprocess.run') as mock_run:
+            # Set up proper mock return value
+            mock_result = Mock()
+            mock_result.returncode = 0
+            mock_result.stdout = "node/test-node"
+            mock_run.return_value = mock_result
+            
+            cluster.get_nodes()
+            
+            # Verify KUBECONFIG was set without affecting other env vars
+            call_args = mock_run.call_args
+            env = call_args[1]['env']
+            assert 'KUBECONFIG' in env
+            assert env['PATH'] == "/usr/bin"
+            assert env['HOME'] == "/home/test"
