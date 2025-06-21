@@ -12,12 +12,12 @@ from unittest.mock import Mock, patch
 
 import pytest
 
-from pytest_kubernetes.kind.command_runner import (
+from pytest_k8s.kind.command_runner import (
     CommandRunner,
     KindCommandRunner,
     KubectlCommandRunner,
 )
-from pytest_kubernetes.kind.errors import (
+from pytest_k8s.kind.errors import (
     DockerNotRunningError,
     KindClusterError,
     KindClusterTimeoutError,

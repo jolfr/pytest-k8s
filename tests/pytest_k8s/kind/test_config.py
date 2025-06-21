@@ -7,14 +7,14 @@ including PortMapping, NodeConfig, KindClusterConfig, and helper functions.
 
 import pytest
 
-from pytest_kubernetes.kind.config import (
+from pytest_k8s.kind.config import (
     KindClusterConfig,
     NodeConfig,
     PortMapping,
     create_ha_config,
     create_simple_config,
 )
-from pytest_kubernetes.kind.errors import KindClusterConfigError
+from pytest_k8s.kind.errors import KindClusterConfigError
 
 
 class TestPortMapping:

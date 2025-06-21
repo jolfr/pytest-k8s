@@ -10,9 +10,9 @@ from unittest.mock import Mock, patch
 
 import pytest
 
-from pytest_kubernetes.kind.cluster import KindCluster
-from pytest_kubernetes.kind.cluster_manager import KindClusterManager
-from pytest_kubernetes.kind.errors import KindClusterNotFoundError
+from pytest_k8s.kind.cluster import KindCluster
+from pytest_k8s.kind.cluster_manager import KindClusterManager
+from pytest_k8s.kind.errors import KindClusterNotFoundError
 
 
 class TestKindClusterManager:

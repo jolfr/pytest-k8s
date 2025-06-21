@@ -1,5 +1,5 @@
 [project]
-name = "pytest-kubernetes"
+name = "pytest-k8s"
 version = "0.1.0"
 description = "Kubernetes-based testing for pytest"
 readme = "README.md"

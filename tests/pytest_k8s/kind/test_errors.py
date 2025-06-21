@@ -7,7 +7,7 @@ management functionality.
 
 import pytest
 
-from pytest_kubernetes.kind.errors import (
+from pytest_k8s.kind.errors import (
     DockerNotRunningError,
     KindClusterConfigError,
     KindClusterCreationError,

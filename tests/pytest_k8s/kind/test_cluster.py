@@ -15,9 +15,9 @@ from unittest.mock import MagicMock, Mock, call, mock_open, patch
 import pytest
 import yaml
 
-from pytest_kubernetes.kind.cluster import KindCluster
-from pytest_kubernetes.kind.config import KindClusterConfig, create_simple_config
-from pytest_kubernetes.kind.errors import (
+from pytest_k8s.kind.cluster import KindCluster
+from pytest_k8s.kind.config import KindClusterConfig, create_simple_config
+from pytest_k8s.kind.errors import (
     KindClusterError,
     KindClusterCreationError,
     KindClusterDeletionError,
@@ -235,7 +235,7 @@ class TestKindCluster:
         with pytest.raises(KindClusterCreationError, match="Failed to export kubeconfig"):
             cluster._setup_kubeconfig()
     
-    @patch('pytest_kubernetes.kind.cluster.KubectlCommandRunner')
+    @patch('pytest_k8s.kind.cluster.KubectlCommandRunner')
     @patch.object(KindCluster, 'exists')
     @patch.object(KindCluster, '_create_cluster_config')
     @patch.object(KindCluster, '_setup_kubeconfig')
@@ -736,7 +736,7 @@ class TestKindClusterEdgeCases:
         assert cluster.config.timeout == 0
         
         # Test negative timeout (should be handled by config validation)
-        from pytest_kubernetes.kind.errors import KindClusterConfigError
+        from pytest_k8s.kind.errors import KindClusterConfigError
         with pytest.raises(KindClusterConfigError, match="Invalid timeout"):
             cluster = KindCluster(timeout=-1)
         
