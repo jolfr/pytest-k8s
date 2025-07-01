@@ -114,6 +114,61 @@ class KindLoggingConfig:
         )
 
 
+class ClusterConfig:
+    """
+    Configuration for cluster fixtures.
+    
+    This class manages configuration settings for k8s cluster fixtures.
+    """
+    
+    def __init__(
+        self,
+        default_scope: str = "session",
+    ):
+        """
+        Initialize cluster configuration.
+        
+        Args:
+            default_scope: Default scope for k8s_cluster fixture
+        """
+        self.default_scope = default_scope
+    
+    @classmethod
+    def from_pytest_config(cls, pytest_config: Any) -> "ClusterConfig":
+        """
+        Create configuration from pytest config object.
+        
+        Args:
+            pytest_config: Pytest configuration object
+            
+        Returns:
+            ClusterConfig instance
+        """
+        default_scope = pytest_config.getoption("k8s_cluster_scope", "session")
+        
+        return cls(
+            default_scope=default_scope,
+        )
+    
+    @classmethod
+    def get_default(cls) -> "ClusterConfig":
+        """
+        Get default configuration.
+        
+        Returns:
+            ClusterConfig with default settings
+        """
+        return cls()
+    
+    def __repr__(self) -> str:
+        """String representation of configuration."""
+        return (
+            f"ClusterConfig("
+            f"default_scope='{self.default_scope}'"
+            f")"
+        )
+
+
 class PluginConfig:
     """
     Global configuration for the pytest-k8s plugin.
@@ -133,8 +188,10 @@ class PluginConfig:
         
         if pytest_config:
             self.kind_logging = KindLoggingConfig.from_pytest_config(pytest_config)
+            self.cluster = ClusterConfig.from_pytest_config(pytest_config)
         else:
             self.kind_logging = KindLoggingConfig.get_default()
+            self.cluster = ClusterConfig.get_default()
     
     @classmethod
     def get_default(cls) -> "PluginConfig":

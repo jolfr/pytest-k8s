@@ -10,6 +10,20 @@ from typing import Any
 
 from .config import PluginConfig, set_plugin_config
 
+# Import fixtures to make them available
+from .fixtures.k8s_cluster import (
+    k8s_cluster,
+    k8s_cluster_session,
+    k8s_cluster_module,
+    k8s_cluster_class,
+    k8s_cluster_function,
+    k8s_cluster_factory,
+    k8s_cluster_per_test,
+    k8s_cluster_per_class,
+    k8s_cluster_per_module,
+    k8s_cluster_per_session,
+)
+
 
 def pytest_addoption(parser: pytest.Parser) -> None:
     """
@@ -53,6 +67,14 @@ def pytest_addoption(parser: pytest.Parser) -> None:
         action="store_true",
         default=False,
         help="Include stream info (STDOUT/STDERR) in log messages for debugging"
+    )
+    
+    # Cluster fixture options
+    group.addoption(
+        "--k8s-cluster-scope",
+        default="session",
+        choices=["function", "class", "module", "session"],
+        help="Default scope for k8s_cluster fixture (default: session)"
     )
 
 

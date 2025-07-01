@@ -25,6 +25,7 @@ addopts = [
     "-v",                    # Verbose output
     "--capture=no",          # No output capturing
     "--log-cli-level=INFO",  # Show logs at INFO level and above
+    "--k8s-cluster-scope=session",  # Default cluster scope
 ]
 pytester_example_dir = "tests/pytest_k8s/fixtures"
 

@@ -20,12 +20,27 @@ from .plugin import (
 )
 
 # Import configuration classes for external use
-from .config import KindLoggingConfig, PluginConfig, get_plugin_config, set_plugin_config
+from .config import KindLoggingConfig, ClusterConfig, PluginConfig, get_plugin_config, set_plugin_config
 
 # Import kind utilities for external use
 from .kind.loggers import KindLogger, KindLoggerFactory, get_kind_logger
 from .kind.streaming import StreamingSubprocess, create_streaming_subprocess
 from .kind.command_runner import KindCommandRunner, KubectlCommandRunner
+
+# Import fixtures for external use
+from .fixtures import (
+    k8s_cluster,
+    k8s_cluster_session,
+    k8s_cluster_module,
+    k8s_cluster_class,
+    k8s_cluster_function,
+    k8s_cluster_factory,
+    k8s_cluster_per_test,
+    k8s_cluster_per_class,
+    k8s_cluster_per_module,
+    k8s_cluster_per_session,
+    ClusterFixtureManager,
+)
 
 __all__ = [
     # Plugin hooks
@@ -38,6 +53,7 @@ __all__ = [
     
     # Configuration
     "KindLoggingConfig",
+    "ClusterConfig",
     "PluginConfig", 
     "get_plugin_config",
     "set_plugin_config",
@@ -54,10 +70,17 @@ __all__ = [
     # Command runners
     "KindCommandRunner",
     "KubectlCommandRunner",
+    
+    # Fixtures
+    "k8s_cluster",
+    "k8s_cluster_session",
+    "k8s_cluster_module",
+    "k8s_cluster_class",
+    "k8s_cluster_function",
+    "k8s_cluster_factory",
+    "k8s_cluster_per_test",
+    "k8s_cluster_per_class",
+    "k8s_cluster_per_module",
+    "k8s_cluster_per_session",
+    "ClusterFixtureManager",
 ]
-
-# Plugin fixtures and hooks will be implemented here
-# TODO: Implement k8s_cluster fixture
-# TODO: Implement k8s_client fixture  
-# TODO: Implement k8s_namespace fixture
-# TODO: Implement k8s_resource fixture

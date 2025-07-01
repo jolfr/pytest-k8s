@@ -198,30 +198,202 @@ def test_configmap_data(k8s_client, k8s_namespace):
 
 ## Configuration
 
+### Cluster Scope Configuration
+
+Control how clusters are shared across tests with configurable scopes:
+
+#### Default Scope Configuration
+
+Set the default cluster scope in your `pyproject.toml`:
+
+```toml
+[tool.pytest.ini_options]
+addopts = [
+    "--k8s-cluster-scope=session",  # Default cluster scope
+]
+```
+
+Available scopes:
+- `session` - One cluster for the entire test session (default)
+- `module` - One cluster per test module
+- `class` - One cluster per test class
+- `function` - New cluster for each test function
+
+#### Command Line Override
+
+Override the default scope for a test run:
+
+```bash
+# Use function scope for all tests
+pytest --k8s-cluster-scope=function
+
+# Use module scope for better isolation
+pytest --k8s-cluster-scope=module
+```
+
+#### Per-Test Scope Override with Parametrize
+
+Override the scope for specific tests using `pytest.mark.parametrize`:
+
+```python
+import pytest
+
+# Override scope to function for this specific test
+@pytest.mark.parametrize("k8s_cluster", [
+    {"name": "isolated-cluster", "scope": "function"}
+], indirect=True)
+def test_with_isolated_cluster(k8s_cluster):
+    """This test gets its own dedicated cluster."""
+    assert k8s_cluster.name == "isolated-cluster"
+
+# Multiple configurations with different scopes
+@pytest.mark.parametrize("k8s_cluster", [
+    {"name": "fast-cluster", "scope": "session", "timeout": 300},
+    {"name": "slow-cluster", "scope": "function", "timeout": 600},
+], indirect=True)
+def test_with_different_configs(k8s_cluster):
+    """Test with different cluster configurations."""
+    assert k8s_cluster.name in ["fast-cluster", "slow-cluster"]
+
+# Override scope with additional configuration
+@pytest.mark.parametrize("k8s_cluster", [
+    {
+        "name": "custom-cluster",
+        "scope": "function",
+        "image": "kindest/node:v1.25.0",
+        "timeout": 600,
+        "keep_cluster": False
+    }
+], indirect=True)
+def test_with_custom_cluster(k8s_cluster):
+    """Test with completely custom cluster configuration."""
+    assert k8s_cluster.name == "custom-cluster"
+```
+
+#### Available Cluster Fixtures
+
+Choose the appropriate fixture based on your testing needs:
+
+```python
+# Default fixture (uses configured default scope)
+def test_default_scope(k8s_cluster):
+    pass
+
+# Explicit scope fixtures
+def test_session_cluster(k8s_cluster_session):
+    pass
+
+def test_module_cluster(k8s_cluster_module):
+    pass
+
+def test_class_cluster(k8s_cluster_class):
+    pass
+
+def test_function_cluster(k8s_cluster_function):
+    pass
+
+# Descriptive aliases
+def test_per_session(k8s_cluster_per_session):
+    pass
+
+def test_per_module(k8s_cluster_per_module):
+    pass
+
+def test_per_class(k8s_cluster_per_class):
+    pass
+
+def test_per_test(k8s_cluster_per_test):
+    pass
+
+# Factory for multiple clusters
+def test_multiple_clusters(k8s_cluster_factory):
+    cluster1 = k8s_cluster_factory(name="cluster1")
+    cluster2 = k8s_cluster_factory(name="cluster2")
+    # Both clusters are automatically cleaned up
+```
+
+### Advanced Parametrize Examples
+
+#### Testing Across Multiple Kubernetes Versions
+
+```python
+@pytest.mark.parametrize("k8s_cluster", [
+    {"name": "k8s-1-25", "image": "kindest/node:v1.25.0", "scope": "function"},
+    {"name": "k8s-1-26", "image": "kindest/node:v1.26.0", "scope": "function"},
+    {"name": "k8s-1-27", "image": "kindest/node:v1.27.0", "scope": "function"},
+], indirect=True)
+def test_across_k8s_versions(k8s_cluster):
+    """Test compatibility across different Kubernetes versions."""
+    # Your test logic here
+    pass
+```
+
+#### Performance Testing with Different Cluster Configurations
+
+```python
+@pytest.mark.parametrize("k8s_cluster", [
+    {
+        "name": "single-node",
+        "scope": "function",
+        "config": create_single_node_config()
+    },
+    {
+        "name": "multi-node", 
+        "scope": "function",
+        "config": create_multi_node_config()
+    }
+], indirect=True)
+def test_performance_scenarios(k8s_cluster):
+    """Test performance with different cluster topologies."""
+    # Performance test logic here
+    pass
+```
+
+#### Conditional Scope Based on Test Marks
+
+```python
+# Fast tests use session scope for speed
+@pytest.mark.fast
+@pytest.mark.parametrize("k8s_cluster", [
+    {"scope": "session"}
+], indirect=True)
+def test_fast_operation(k8s_cluster):
+    pass
+
+# Slow tests use function scope for isolation
+@pytest.mark.slow
+@pytest.mark.parametrize("k8s_cluster", [
+    {"scope": "function"}
+], indirect=True)
+def test_slow_operation(k8s_cluster):
+    pass
+```
+
 ### Kind Log Streaming
 
 Control how kind command output is logged and streamed:
 
-```python
-# pytest.ini or pyproject.toml
+```toml
 [tool.pytest.ini_options]
-k8s_kind_stream_logs = true           # Enable/disable log streaming (default: true)
-k8s_kind_stdout_level = "INFO"        # Log level for stdout (DEBUG, INFO, WARNING, ERROR)
-k8s_kind_stderr_level = "WARNING"     # Log level for stderr (DEBUG, INFO, WARNING, ERROR)
-k8s_kind_log_format = "[KIND {stream}] {message}"  # Log message format
+addopts = [
+    "--k8s-kind-stream-logs",                    # Enable log streaming (default: true)
+    "--k8s-kind-log-level=INFO",                 # Log level (DEBUG, INFO, WARNING, ERROR)
+    "--k8s-kind-log-format=[KIND] {message}",    # Log message format
+    "--k8s-kind-include-stream-info",            # Include stream info for debugging
+]
 ```
 
-You can also configure these via command line:
+Command line options:
 
 ```bash
 # Disable log streaming
 pytest --k8s-no-kind-stream-logs
 
-# Set custom log levels
-pytest --k8s-kind-stdout-level=DEBUG --k8s-kind-stderr-level=ERROR
+# Set custom log level
+pytest --k8s-kind-log-level=DEBUG
 
 # Custom log format
-pytest --k8s-kind-log-format="[CUSTOM {stream}] {message}"
+pytest --k8s-kind-log-format="[CUSTOM] {message}"
 ```
 
 ### Configuration in conftest.py
@@ -230,43 +402,17 @@ Override settings programmatically in your `conftest.py`:
 
 ```python
 def pytest_configure(config):
+    # Use function scope in CI for better isolation
+    if os.getenv("CI"):
+        config.option.k8s_cluster_scope = "function"
+    
+    # Use session scope locally for faster development
+    else:
+        config.option.k8s_cluster_scope = "session"
+    
     # Disable streaming in CI environments
     if os.getenv("CI"):
         config.option.k8s_kind_stream_logs = False
-    
-    # More verbose logging for development
-    if os.getenv("DEBUG"):
-        config.option.k8s_kind_stdout_level = "DEBUG"
-        config.option.k8s_kind_stderr_level = "DEBUG"
-```
-
-### Cluster Sharing
-
-Control how clusters are shared across tests:
-
-```python
-# pytest.ini or pyproject.toml
-[tool.pytest.ini_options]
-k8s_cluster_scope = "session"  # session, class, or function
-```
-
-### Error Handling
-
-Configure how cluster creation failures are handled:
-
-```python
-# pytest.ini or pyproject.toml
-[tool.pytest.ini_options]
-k8s_fail_on_cluster_error = false  # true to raise errors, false to skip tests
-```
-
-### Cluster Configuration
-
-```python
-# pytest.ini or pyproject.toml
-[tool.pytest.ini_options]
-k8s_cluster_timeout = 300  # seconds to wait for cluster creation
-k8s_keep_cluster = false   # true to keep cluster after tests (for debugging)
 ```
 
 ## Requirements
