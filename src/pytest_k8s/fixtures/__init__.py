@@ -2,7 +2,7 @@
 Pytest fixtures for Kubernetes testing.
 
 This module provides pytest fixtures for creating and managing Kubernetes
-resources during testing, including clusters, clients, and namespaces.
+resources during testing, including clusters and clients.
 """
 
 from .k8s_cluster import (
@@ -19,6 +19,11 @@ from .k8s_cluster import (
     ClusterFixtureManager,
 )
 
+from .k8s_client import (
+    KubernetesClient,
+    k8s_client,
+)
+
 __all__ = [
     # Main cluster fixtures
     "k8s_cluster",
@@ -28,7 +33,7 @@ __all__ = [
     "k8s_cluster_function",
     "k8s_cluster_factory",
     
-    # Descriptive aliases
+    # Descriptive cluster aliases
     "k8s_cluster_per_test",
     "k8s_cluster_per_class",
     "k8s_cluster_per_module",
@@ -36,4 +41,8 @@ __all__ = [
     
     # Manager class
     "ClusterFixtureManager",
+    
+    # Client class and fixture
+    "KubernetesClient",
+    "k8s_client",
 ]

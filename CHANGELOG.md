@@ -8,6 +8,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- **k8s_client fixture**: New comprehensive Kubernetes API client fixture with direct access to all API clients
+  - `CoreV1Api` - Core Kubernetes resources (pods, services, namespaces, etc.)
+  - `AppsV1Api` - Application resources (deployments, daemonsets, etc.)
+  - `NetworkingV1Api` - Networking resources (ingresses, network policies, etc.)
+  - `RbacAuthorizationV1Api` - RBAC resources (roles, bindings, etc.)
+  - `CustomObjectsApi` - Custom resource definitions
+- **KubernetesClient wrapper class**: Provides convenient access to Kubernetes API clients with automatic cluster integration
+- **Automatic cluster detection**: k8s_client fixture automatically detects and uses existing cluster fixtures
+- **Multiple usage patterns**: Supports implicit cluster usage, explicit cluster usage, and parameterized cluster usage
+- **Comprehensive test examples**: Added `tests/test_examples.py` with real-world usage examples
 - **Configurable cluster scope**: Added support for configuring default cluster scope via command line and configuration files
 - **Scope override via parametrize**: Added ability to override cluster scope per test using `pytest.mark.parametrize`
 - **New command line option**: `--k8s-cluster-scope` to set default cluster scope (function, class, module, session)
@@ -17,7 +27,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Enhanced
 - **Fixture system**: Enhanced all cluster fixtures to support scope override via parameters
 - **Configuration system**: Extended `PluginConfig` to include cluster configuration management
-- **Documentation**: Updated README.md with comprehensive examples of scope configuration and parametrize usage
+- **Plugin registration**: Updated plugin to properly register k8s_client fixture
+- **Documentation**: Updated README.md with comprehensive examples of k8s_client usage and scope configuration
 
 ### Configuration
 - **pyproject.toml support**: Default cluster scope can now be configured in `pyproject.toml`:

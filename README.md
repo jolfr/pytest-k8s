@@ -42,9 +42,10 @@ import pytest
 from kubernetes import client
 
 
-def test_deployment_creation(k8s_client, k8s_namespace):
+def test_deployment_creation(k8s_client):
     """Test creating a simple deployment."""
-    apps_v1 = client.AppsV1Api(k8s_client)
+    # Access the Apps V1 API directly from the client
+    apps_v1 = k8s_client.AppsV1Api
     
     deployment = client.V1Deployment(
         metadata=client.V1ObjectMeta(name="test-deployment"),
@@ -70,7 +71,7 @@ def test_deployment_creation(k8s_client, k8s_namespace):
     
     # Create the deployment
     created = apps_v1.create_namespaced_deployment(
-        namespace=k8s_namespace,
+        namespace="default",
         body=deployment
     )
     
@@ -91,14 +92,53 @@ def test_cluster_info(k8s_cluster):
 ```
 
 ### `k8s_client`
-Provides a configured Kubernetes API client.
+Provides a configured Kubernetes API client wrapper with direct access to all API clients.
 
 ```python
 def test_with_client(k8s_client):
     """Use the Kubernetes client directly."""
-    v1 = client.CoreV1Api(k8s_client)
-    nodes = v1.list_node()
+    # Access API clients directly from the wrapper
+    core_v1 = k8s_client.CoreV1Api
+    apps_v1 = k8s_client.AppsV1Api
+    networking_v1 = k8s_client.NetworkingV1Api
+    rbac_v1 = k8s_client.RbacAuthorizationV1Api
+    custom_objects = k8s_client.CustomObjectsApi
+    
+    # List nodes using the Core V1 API
+    nodes = core_v1.list_node()
     assert len(nodes.items) > 0
+```
+
+The `k8s_client` fixture automatically connects to a cluster and provides convenient access to:
+- `CoreV1Api` - Core Kubernetes resources (pods, services, namespaces, etc.)
+- `AppsV1Api` - Application resources (deployments, daemonsets, etc.)
+- `NetworkingV1Api` - Networking resources (ingresses, network policies, etc.)
+- `RbacAuthorizationV1Api` - RBAC resources (roles, bindings, etc.)
+- `CustomObjectsApi` - Custom resource definitions
+
+#### Usage Patterns
+
+```python
+# Implicit cluster usage - just declare k8s_client
+def test_simple(k8s_client):
+    core_v1 = k8s_client.CoreV1Api
+    namespaces = core_v1.list_namespace()
+    assert len(namespaces.items) > 0
+
+# Explicit cluster usage - both cluster and client
+def test_explicit(k8s_cluster, k8s_client):
+    assert k8s_client.cluster is k8s_cluster
+    core_v1 = k8s_client.CoreV1Api
+    # Use the client...
+
+# Parameterized cluster usage
+@pytest.mark.parametrize("k8s_cluster", [
+    {"name": "test-cluster", "timeout": 600}
+], indirect=True)
+def test_parameterized(k8s_cluster, k8s_client):
+    assert k8s_cluster.name == "test-cluster"
+    core_v1 = k8s_client.CoreV1Api
+    # Use the client...
 ```
 
 ### `k8s_namespace`
@@ -134,33 +174,62 @@ def test_custom_resource(k8s_resource):
 ### Testing Deployments
 
 ```python
-def test_deployment_scaling(k8s_client, k8s_namespace):
+def test_deployment_scaling(k8s_client):
     """Test deployment scaling functionality."""
-    apps_v1 = client.AppsV1Api(k8s_client)
+    # Access the Apps V1 API directly
+    apps_v1 = k8s_client.AppsV1Api
     
     # Create deployment
-    deployment = create_test_deployment("scalable-app", replicas=1)
-    apps_v1.create_namespaced_deployment(k8s_namespace, deployment)
+    deployment = client.V1Deployment(
+        metadata=client.V1ObjectMeta(name="scalable-app"),
+        spec=client.V1DeploymentSpec(
+            replicas=1,
+            selector=client.V1LabelSelector(match_labels={"app": "scalable-app"}),
+            template=client.V1PodTemplateSpec(
+                metadata=client.V1ObjectMeta(labels={"app": "scalable-app"}),
+                spec=client.V1PodSpec(
+                    containers=[
+                        client.V1Container(
+                            name="app",
+                            image="nginx:alpine",
+                            ports=[client.V1ContainerPort(container_port=80)]
+                        )
+                    ]
+                )
+            )
+        )
+    )
+    
+    # Create the deployment
+    created = apps_v1.create_namespaced_deployment(
+        namespace="default",
+        body=deployment
+    )
+    assert created.spec.replicas == 1
     
     # Scale up
     deployment.spec.replicas = 3
     apps_v1.patch_namespaced_deployment(
         name="scalable-app",
-        namespace=k8s_namespace,
+        namespace="default",
         body=deployment
     )
     
     # Verify scaling
-    updated = apps_v1.read_namespaced_deployment("scalable-app", k8s_namespace)
+    updated = apps_v1.read_namespaced_deployment("scalable-app", "default")
     assert updated.spec.replicas == 3
+    
+    # Cleanup
+    apps_v1.delete_namespaced_deployment(name="scalable-app", namespace="default")
 ```
 
 ### Testing Services
 
 ```python
-def test_service_creation(k8s_client, k8s_namespace):
+def test_service_creation(k8s_client):
     """Test service creation and configuration."""
-    v1 = client.CoreV1Api(k8s_client)
+    # Access the Core V1 API directly
+    core_v1 = k8s_client.CoreV1Api
     
     service = client.V1Service(
         metadata=client.V1ObjectMeta(name="test-service"),
@@ -171,17 +240,25 @@ def test_service_creation(k8s_client, k8s_namespace):
         )
     )
     
-    created = v1.create_namespaced_service(k8s_namespace, service)
+    # Create the service
+    created = core_v1.create_namespaced_service(
+        namespace="default",
+        body=service
+    )
     assert created.spec.type == "ClusterIP"
     assert created.spec.ports[0].port == 80
+    
+    # Cleanup
+    core_v1.delete_namespaced_service(name="test-service", namespace="default")
 ```
 
 ### Testing ConfigMaps and Secrets
 
 ```python
-def test_configmap_data(k8s_client, k8s_namespace):
+def test_configmap_data(k8s_client):
     """Test ConfigMap data handling."""
-    v1 = client.CoreV1Api(k8s_client)
+    # Access the Core V1 API directly
+    core_v1 = k8s_client.CoreV1Api
     
     configmap = client.V1ConfigMap(
         metadata=client.V1ObjectMeta(name="app-config"),
@@ -191,9 +268,86 @@ def test_configmap_data(k8s_client, k8s_namespace):
         }
     )
     
-    created = v1.create_namespaced_config_map(k8s_namespace, configmap)
+    # Create the ConfigMap
+    created = core_v1.create_namespaced_config_map(
+        namespace="default",
+        body=configmap
+    )
     assert created.data["database_url"] == "postgresql://localhost:5432/testdb"
     assert created.data["debug"] == "true"
+    
+    # Cleanup
+    core_v1.delete_namespaced_config_map(name="app-config", namespace="default")
+```
+
+### Testing with Multiple API Clients
+
+```python
+def test_complete_application_stack(k8s_client):
+    """Test deploying a complete application stack."""
+    # Access multiple API clients
+    core_v1 = k8s_client.CoreV1Api
+    apps_v1 = k8s_client.AppsV1Api
+    networking_v1 = k8s_client.NetworkingV1Api
+    
+    app_name = "test-app"
+    namespace = "default"
+    
+    try:
+        # 1. Create ConfigMap
+        configmap = client.V1ConfigMap(
+            metadata=client.V1ObjectMeta(name=f"{app_name}-config"),
+            data={"app.properties": "debug=true\nport=8080"}
+        )
+        core_v1.create_namespaced_config_map(namespace, configmap)
+        
+        # 2. Create Deployment
+        deployment = client.V1Deployment(
+            metadata=client.V1ObjectMeta(name=f"{app_name}-deployment"),
+            spec=client.V1DeploymentSpec(
+                replicas=2,
+                selector=client.V1LabelSelector(match_labels={"app": app_name}),
+                template=client.V1PodTemplateSpec(
+                    metadata=client.V1ObjectMeta(labels={"app": app_name}),
+                    spec=client.V1PodSpec(
+                        containers=[
+                            client.V1Container(
+                                name=app_name,
+                                image="nginx:alpine",
+                                ports=[client.V1ContainerPort(container_port=80)]
+                            )
+                        ]
+                    )
+                )
+            )
+        )
+        apps_v1.create_namespaced_deployment(namespace, deployment)
+        
+        # 3. Create Service
+        service = client.V1Service(
+            metadata=client.V1ObjectMeta(name=f"{app_name}-service"),
+            spec=client.V1ServiceSpec(
+                selector={"app": app_name},
+                ports=[client.V1ServicePort(port=80, target_port=80)]
+            )
+        )
+        core_v1.create_namespaced_service(namespace, service)
+        
+        # 4. Verify everything was created
+        assert core_v1.read_namespaced_config_map(f"{app_name}-config", namespace)
+        assert apps_v1.read_namespaced_deployment(f"{app_name}-deployment", namespace)
+        assert core_v1.read_namespaced_service(f"{app_name}-service", namespace)
+        
+        print(f"✓ Successfully deployed {app_name} stack")
+        
+    finally:
+        # Cleanup
+        try:
+            apps_v1.delete_namespaced_deployment(f"{app_name}-deployment", namespace)
+            core_v1.delete_namespaced_service(f"{app_name}-service", namespace)
+            core_v1.delete_namespaced_config_map(f"{app_name}-config", namespace)
+        except:
+            pass  # Ignore cleanup errors
 ```
 
 ## Configuration

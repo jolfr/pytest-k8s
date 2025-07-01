@@ -24,6 +24,8 @@ from .fixtures.k8s_cluster import (
     k8s_cluster_per_session,
 )
 
+from .fixtures.k8s_client import k8s_client
+
 
 def pytest_addoption(parser: pytest.Parser) -> None:
     """

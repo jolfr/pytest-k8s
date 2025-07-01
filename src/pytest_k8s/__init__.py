@@ -40,6 +40,8 @@ from .fixtures import (
     k8s_cluster_per_module,
     k8s_cluster_per_session,
     ClusterFixtureManager,
+    KubernetesClient,
+    k8s_client,
 )
 
 __all__ = [
@@ -83,4 +85,6 @@ __all__ = [
     "k8s_cluster_per_module",
     "k8s_cluster_per_session",
     "ClusterFixtureManager",
+    "KubernetesClient",
+    "k8s_client",
 ]
