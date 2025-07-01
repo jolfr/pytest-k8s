@@ -20,3 +20,8 @@ build-backend = "hatchling.build"
 addopts = [
     "--import-mode=importlib",
 ]
+
+[dependency-groups]
+dev = [
+    "pytest-cov>=6.2.1",
+]
