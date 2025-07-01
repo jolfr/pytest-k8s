@@ -20,6 +20,7 @@ build-backend = "hatchling.build"
 addopts = [
     "--import-mode=importlib",
 ]
+pytester_example_dir = "tests/pytest_k8s/fixtures"
 
 [dependency-groups]
 dev = [
