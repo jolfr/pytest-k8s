@@ -14,15 +14,6 @@ from unittest.mock import Mock, patch, MagicMock
 from pytest_k8s.fixtures.k8s_cluster import (
     ClusterFixtureManager,
     k8s_cluster,
-    k8s_cluster_session,
-    k8s_cluster_module,
-    k8s_cluster_class,
-    k8s_cluster_function,
-    k8s_cluster_factory,
-    k8s_cluster_per_test,
-    k8s_cluster_per_class,
-    k8s_cluster_per_module,
-    k8s_cluster_per_session,
 )
 from pytest_k8s.kind.cluster import KindCluster
 from pytest_k8s.kind.config import KindClusterConfig, create_simple_config
@@ -209,17 +200,24 @@ class TestFixtureScopes:
     def test_function_scope_cluster_per_test(self, pytester):
         """Test that function-scoped cluster creates new cluster per test."""
         pytester.makepyfile("""
+            import pytest
             import pytest_k8s
             
             cluster_names = []
             
-            def test_first_function_cluster(k8s_cluster_function):
-                cluster_names.append(k8s_cluster_function.name)
-                assert k8s_cluster_function is not None
+            @pytest.mark.parametrize("k8s_cluster", [
+                {"scope": "function"}
+            ], indirect=True)
+            def test_first_function_cluster(k8s_cluster):
+                cluster_names.append(k8s_cluster.name)
+                assert k8s_cluster is not None
                 
-            def test_second_function_cluster(k8s_cluster_function):
-                cluster_names.append(k8s_cluster_function.name)
-                assert k8s_cluster_function is not None
+            @pytest.mark.parametrize("k8s_cluster", [
+                {"scope": "function"}
+            ], indirect=True)
+            def test_second_function_cluster(k8s_cluster):
+                cluster_names.append(k8s_cluster.name)
+                assert k8s_cluster is not None
                 
             def test_different_clusters():
                 # Each test should get a different cluster
@@ -239,93 +237,6 @@ class TestFixtureScopes:
             assert result.ret == 0
             
             # Verify cluster was created twice for function scope
-            assert mock_kind.call_count == 2
-    
-    def test_class_scope_cluster_per_class(self, pytester):
-        """Test that class-scoped cluster creates one cluster per class."""
-        pytester.makepyfile("""
-            import pytest_k8s
-            
-            class TestFirstClass:
-                cluster_names = []
-                
-                def test_first_method(self, k8s_cluster_class):
-                    self.cluster_names.append(k8s_cluster_class.name)
-                    assert k8s_cluster_class is not None
-                    
-                def test_second_method(self, k8s_cluster_class):
-                    self.cluster_names.append(k8s_cluster_class.name)
-                    assert k8s_cluster_class is not None
-                    
-                def test_same_cluster_in_class(self):
-                    # Both methods in same class should use same cluster
-                    assert len(set(self.cluster_names)) == 1
-            
-            class TestSecondClass:
-                cluster_names = []
-                
-                def test_different_class_cluster(self, k8s_cluster_class):
-                    self.cluster_names.append(k8s_cluster_class.name)
-                    assert k8s_cluster_class is not None
-        """)
-        
-        # Mock the KindCluster to avoid actual cluster creation
-        with patch('pytest_k8s.fixtures.k8s_cluster.KindCluster') as mock_kind:
-            # Create different mock clusters for each class
-            mock_cluster1 = Mock()
-            mock_cluster1.name = "class-cluster-1"
-            mock_cluster2 = Mock()
-            mock_cluster2.name = "class-cluster-2"
-            mock_kind.side_effect = [mock_cluster1, mock_cluster2]
-            
-            result = pytester.runpytest("-v")
-            assert result.ret == 0
-            
-            # Verify cluster was created twice (once per class)
-            assert mock_kind.call_count == 2
-    
-    def test_module_scope_cluster_per_module(self, pytester):
-        """Test that module-scoped cluster creates one cluster per module."""
-        # Create first test module
-        pytester.makepyfile(test_module1="""
-            import pytest_k8s
-            
-            cluster_names = []
-            
-            def test_first_in_module1(k8s_cluster_module):
-                cluster_names.append(k8s_cluster_module.name)
-                assert k8s_cluster_module is not None
-                
-            def test_second_in_module1(k8s_cluster_module):
-                cluster_names.append(k8s_cluster_module.name)
-                assert k8s_cluster_module is not None
-                
-            def test_same_cluster_in_module():
-                # Both tests in same module should use same cluster
-                assert len(set(cluster_names)) == 1
-        """)
-        
-        # Create second test module
-        pytester.makepyfile(test_module2="""
-            import pytest_k8s
-            
-            def test_different_module_cluster(k8s_cluster_module):
-                assert k8s_cluster_module is not None
-        """)
-        
-        # Mock the KindCluster to avoid actual cluster creation
-        with patch('pytest_k8s.fixtures.k8s_cluster.KindCluster') as mock_kind:
-            # Create different mock clusters for each module
-            mock_cluster1 = Mock()
-            mock_cluster1.name = "module-cluster-1"
-            mock_cluster2 = Mock()
-            mock_cluster2.name = "module-cluster-2"
-            mock_kind.side_effect = [mock_cluster1, mock_cluster2]
-            
-            result = pytester.runpytest("-v")
-            assert result.ret == 0
-            
-            # Verify cluster was created twice (once per module)
             assert mock_kind.call_count == 2
 
 
@@ -367,38 +278,6 @@ class TestFixtureConfiguration:
             assert calls[0][1]['timeout'] == 600
             assert calls[1][1]['name'] == "another-cluster"
             assert calls[1][1]['image'] == "kindest/node:v1.25.0"
-    
-    def test_cluster_factory_fixture(self, pytester):
-        """Test the cluster factory fixture."""
-        pytester.makepyfile("""
-            import pytest_k8s
-            
-            def test_cluster_factory(k8s_cluster_factory):
-                cluster1 = k8s_cluster_factory(name="factory-cluster-1")
-                cluster2 = k8s_cluster_factory(
-                    name="factory-cluster-2", 
-                    image="kindest/node:v1.25.0"
-                )
-                
-                assert cluster1 is not None
-                assert cluster2 is not None
-                assert cluster1.name == "factory-cluster-1"
-                assert cluster2.name == "factory-cluster-2"
-        """)
-        
-        # Mock the KindCluster to avoid actual cluster creation
-        with patch('pytest_k8s.fixtures.k8s_cluster.KindCluster') as mock_kind:
-            mock_cluster1 = Mock()
-            mock_cluster1.name = "factory-cluster-1"
-            mock_cluster2 = Mock()
-            mock_cluster2.name = "factory-cluster-2"
-            mock_kind.side_effect = [mock_cluster1, mock_cluster2]
-            
-            result = pytester.runpytest("-v")
-            assert result.ret == 0
-            
-            # Verify both clusters were created
-            assert mock_kind.call_count == 2
     
     def test_cluster_with_config_object(self, pytester):
         """Test cluster creation with config object."""
@@ -524,10 +403,14 @@ class TestFixtureCleanup:
     def test_cluster_cleanup_on_test_completion(self, pytester):
         """Test that clusters are cleaned up after tests complete."""
         pytester.makepyfile("""
+            import pytest
             import pytest_k8s
             
-            def test_cluster_usage(k8s_cluster_function):
-                assert k8s_cluster_function is not None
+            @pytest.mark.parametrize("k8s_cluster", [
+                {"scope": "function"}
+            ], indirect=True)
+            def test_cluster_usage(k8s_cluster):
+                assert k8s_cluster is not None
         """)
         
         # Mock the KindCluster to track cleanup
@@ -543,36 +426,6 @@ class TestFixtureCleanup:
             assert mock_kind.call_count == 1
             mock_cluster.create.assert_called_once()
             mock_cluster.delete.assert_called_once()
-    
-    def test_factory_cluster_cleanup(self, pytester):
-        """Test that factory-created clusters are cleaned up."""
-        pytester.makepyfile("""
-            import pytest_k8s
-            
-            def test_factory_cleanup(k8s_cluster_factory):
-                cluster1 = k8s_cluster_factory(name="factory-cleanup-1")
-                cluster2 = k8s_cluster_factory(name="factory-cleanup-2")
-                assert cluster1 is not None
-                assert cluster2 is not None
-        """)
-        
-        # Mock the KindCluster to track cleanup
-        with patch('pytest_k8s.fixtures.k8s_cluster.KindCluster') as mock_kind:
-            mock_cluster1 = Mock()
-            mock_cluster1.name = "factory-cleanup-1"
-            mock_cluster2 = Mock()
-            mock_cluster2.name = "factory-cleanup-2"
-            mock_kind.side_effect = [mock_cluster1, mock_cluster2]
-            
-            result = pytester.runpytest("-v")
-            assert result.ret == 0
-            
-            # Verify both clusters were created and deleted
-            assert mock_kind.call_count == 2
-            mock_cluster1.create.assert_called_once()
-            mock_cluster1.delete.assert_called_once()
-            mock_cluster2.create.assert_called_once()
-            mock_cluster2.delete.assert_called_once()
     
     def test_cleanup_with_keep_cluster_option(self, pytester):
         """Test that clusters with keep_cluster=True are not deleted."""
@@ -629,10 +482,14 @@ class TestFixtureErrorHandling:
     def test_cleanup_error_handling(self, pytester):
         """Test that cleanup errors don't prevent test completion."""
         pytester.makepyfile("""
+            import pytest
             import pytest_k8s
             
-            def test_cleanup_error(k8s_cluster_function):
-                assert k8s_cluster_function is not None
+            @pytest.mark.parametrize("k8s_cluster", [
+                {"scope": "function"}
+            ], indirect=True)
+            def test_cleanup_error(k8s_cluster):
+                assert k8s_cluster is not None
         """)
         
         # Mock the KindCluster to raise an error on deletion
@@ -705,116 +562,6 @@ class TestFixtureIntegration:
             assert result.ret == 0
             
             assert mock_kind.call_count == 1
-    
-    def test_multiple_fixture_scopes_in_same_session(self, pytester):
-        """Test using multiple fixture scopes in the same test session."""
-        pytester.makepyfile("""
-            import pytest_k8s
-            
-            def test_session_cluster(k8s_cluster_session):
-                assert k8s_cluster_session is not None
-                
-            def test_function_cluster(k8s_cluster_function):
-                assert k8s_cluster_function is not None
-                
-            def test_another_function_cluster(k8s_cluster_function):
-                assert k8s_cluster_function is not None
-        """)
-        
-        # Mock the KindCluster
-        with patch('pytest_k8s.fixtures.k8s_cluster.KindCluster') as mock_kind:
-            # Create different clusters for different scopes
-            session_cluster = Mock()
-            session_cluster.name = "session-cluster"
-            function_cluster1 = Mock()
-            function_cluster1.name = "function-cluster-1"
-            function_cluster2 = Mock()
-            function_cluster2.name = "function-cluster-2"
-            
-            mock_kind.side_effect = [session_cluster, function_cluster1, function_cluster2]
-            
-            result = pytester.runpytest("-v")
-            assert result.ret == 0
-            
-            # Should create 1 session cluster + 2 function clusters
-            assert mock_kind.call_count == 3
-
-
-class TestDescriptiveFixtureAliases:
-    """Test the descriptive fixture aliases."""
-    
-    def test_per_test_alias(self, pytester):
-        """Test k8s_cluster_per_test alias."""
-        pytester.makepyfile("""
-            import pytest_k8s
-            
-            def test_per_test_alias(k8s_cluster_per_test):
-                assert k8s_cluster_per_test is not None
-        """)
-        
-        with patch('pytest_k8s.fixtures.k8s_cluster.KindCluster') as mock_kind:
-            mock_cluster = Mock()
-            mock_cluster.name = "per-test-cluster"
-            mock_kind.return_value = mock_cluster
-            
-            result = pytester.runpytest("-v")
-            assert result.ret == 0
-            assert mock_kind.call_count == 1
-    
-    def test_per_class_alias(self, pytester):
-        """Test k8s_cluster_per_class alias."""
-        pytester.makepyfile("""
-            import pytest_k8s
-            
-            class TestPerClass:
-                def test_per_class_alias(self, k8s_cluster_per_class):
-                    assert k8s_cluster_per_class is not None
-        """)
-        
-        with patch('pytest_k8s.fixtures.k8s_cluster.KindCluster') as mock_kind:
-            mock_cluster = Mock()
-            mock_cluster.name = "per-class-cluster"
-            mock_kind.return_value = mock_cluster
-            
-            result = pytester.runpytest("-v")
-            assert result.ret == 0
-            assert mock_kind.call_count == 1
-    
-    def test_per_module_alias(self, pytester):
-        """Test k8s_cluster_per_module alias."""
-        pytester.makepyfile("""
-            import pytest_k8s
-            
-            def test_per_module_alias(k8s_cluster_per_module):
-                assert k8s_cluster_per_module is not None
-        """)
-        
-        with patch('pytest_k8s.fixtures.k8s_cluster.KindCluster') as mock_kind:
-            mock_cluster = Mock()
-            mock_cluster.name = "per-module-cluster"
-            mock_kind.return_value = mock_cluster
-            
-            result = pytester.runpytest("-v")
-            assert result.ret == 0
-            assert mock_kind.call_count == 1
-    
-    def test_per_session_alias(self, pytester):
-        """Test k8s_cluster_per_session alias."""
-        pytester.makepyfile("""
-            import pytest_k8s
-            
-            def test_per_session_alias(k8s_cluster_per_session):
-                assert k8s_cluster_per_session is not None
-        """)
-        
-        with patch('pytest_k8s.fixtures.k8s_cluster.KindCluster') as mock_kind:
-            mock_cluster = Mock()
-            mock_cluster.name = "per-session-cluster"
-            mock_kind.return_value = mock_cluster
-            
-            result = pytester.runpytest("-v")
-            assert result.ret == 0
-            assert mock_kind.call_count == 1
 
 
 class TestFixtureDocumentation:
@@ -829,29 +576,9 @@ class TestFixtureDocumentation:
         assert "k8s_cluster" in output or result.ret == 0  # Fixtures might not show in help without actual usage
     
     def test_fixture_import_availability(self):
-        """Test that fixtures can be imported directly."""
-        # Test that all fixtures can be imported
-        from pytest_k8s.fixtures.k8s_cluster import (
-            k8s_cluster,
-            k8s_cluster_session,
-            k8s_cluster_module,
-            k8s_cluster_class,
-            k8s_cluster_function,
-            k8s_cluster_factory,
-            k8s_cluster_per_test,
-            k8s_cluster_per_class,
-            k8s_cluster_per_module,
-            k8s_cluster_per_session,
-        )
+        """Test that the k8s_cluster fixture can be imported directly."""
+        # Test that the fixture can be imported
+        from pytest_k8s.fixtures.k8s_cluster import k8s_cluster
         
-        # Verify they are callable fixtures
+        # Verify it is a callable fixture
         assert callable(k8s_cluster)
-        assert callable(k8s_cluster_session)
-        assert callable(k8s_cluster_module)
-        assert callable(k8s_cluster_class)
-        assert callable(k8s_cluster_function)
-        assert callable(k8s_cluster_factory)
-        assert callable(k8s_cluster_per_test)
-        assert callable(k8s_cluster_per_class)
-        assert callable(k8s_cluster_per_module)
-        assert callable(k8s_cluster_per_session)

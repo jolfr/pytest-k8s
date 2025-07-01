@@ -252,82 +252,61 @@ def _create_dynamic_cluster_fixture():
     return cluster_fixture
 
 
-# Create fixtures for different scopes
-k8s_cluster_session = _create_scoped_cluster_fixture("session")
-k8s_cluster_module = _create_scoped_cluster_fixture("module")
-k8s_cluster_class = _create_scoped_cluster_fixture("class")
-k8s_cluster_function = _create_scoped_cluster_fixture("function")
-
-# Default fixture with session scope
-k8s_cluster = k8s_cluster_session
-
-
-@pytest.fixture
-def k8s_cluster_factory():
+# Create the main k8s_cluster fixture using dynamic scope
+@pytest.fixture(scope="session")
+def k8s_cluster(request):
     """
-    Factory fixture for creating multiple clusters with custom configurations.
+    Create and manage a Kubernetes cluster for testing.
     
-    This fixture provides a factory function that can create multiple clusters
-    with different configurations within the same test.
+    This fixture creates a kind-based Kubernetes cluster that can be used
+    for testing applications with Kubernetes dependencies. The scope is
+    determined by the plugin configuration or can be overridden via parameters.
     
+    Args:
+        request: Pytest request object containing fixture parameters.
+        
     Returns:
-        Factory function for creating clusters.
+        KindCluster instance ready for testing.
+        
+    Fixture Parameters:
+        name (str, optional): Cluster name. Generated if not provided.
+        config (KindClusterConfig, optional): Cluster configuration object.
+        config_path (str|Path, optional): Path to cluster configuration file.
+        timeout (int, optional): Timeout for cluster operations (default: 300).
+        keep_cluster (bool, optional): Keep cluster after tests (default: False).
+        image (str, optional): Kubernetes node image to use.
+        extra_port_mappings (list, optional): Additional port mappings.
+        scope (str, optional): Override the default scope for this specific cluster.
         
     Example:
-        def test_multiple_clusters(k8s_cluster_factory):
-            cluster1 = k8s_cluster_factory(name="cluster1")
-            cluster2 = k8s_cluster_factory(name="cluster2", image="kindest/node:v1.25.0")
-            
-            assert cluster1.is_ready()
-            assert cluster2.is_ready()
+        @pytest.mark.parametrize("k8s_cluster", [
+            {"name": "test-cluster", "timeout": 600, "scope": "function"}
+        ], indirect=True)
+        def test_with_custom_cluster(k8s_cluster):
+            assert k8s_cluster.is_ready()
     """
-    created_clusters = []
+    # Get fixture parameters
+    params = getattr(request, 'param', {})
+    if not isinstance(params, dict):
+        params = {}
     
-    def factory(
-        name: Optional[str] = None,
-        config: Optional[KindClusterConfig] = None,
-        config_path: Optional[Union[str, Path]] = None,
-        timeout: Optional[int] = None,
-        keep_cluster: Optional[bool] = None,
-        image: Optional[str] = None,
-        extra_port_mappings: Optional[list] = None,
-        **kwargs
-    ) -> KindCluster:
-        """
-        Create a cluster with the specified configuration.
-        
-        Args:
-            name: Cluster name. Generated if None.
-            config: Cluster configuration object.
-            config_path: Path to cluster configuration file.
-            timeout: Timeout in seconds for cluster operations.
-            keep_cluster: Whether to keep cluster after deletion is requested.
-            image: Kubernetes node image to use.
-            extra_port_mappings: Additional port mappings for the cluster.
-            **kwargs: Additional cluster configuration options.
-            
-        Returns:
-            KindCluster instance.
-        """
-        cluster = _fixture_manager.create_cluster(
-            scope="function",
-            name=name,
-            config=config,
-            config_path=config_path,
-            timeout=timeout,
-            keep_cluster=keep_cluster,
-            image=image,
-            extra_port_mappings=extra_port_mappings,
-            **kwargs
-        )
-        created_clusters.append(cluster)
-        return cluster
+    # Get the default scope from configuration
+    plugin_config = get_plugin_config()
+    default_scope = plugin_config.cluster.default_scope
     
-    yield factory
+    # Extract scope override if provided
+    effective_scope = params.pop('scope', default_scope)
     
-    # Cleanup all created clusters
-    for cluster in created_clusters:
+    # Create the cluster
+    cluster = _fixture_manager.create_cluster(scope=effective_scope, **params)
+    
+    # Register cleanup
+    def cleanup():
         _fixture_manager.cleanup_cluster(cluster)
+    
+    request.addfinalizer(cleanup)
+    
+    return cluster
 
 
 @pytest.fixture(scope="session", autouse=True)
@@ -342,35 +321,3 @@ def _cleanup_all_clusters():
     
     # Cleanup any remaining clusters
     _fixture_manager.cleanup_all()
-
-
-# Convenience fixtures for specific scopes with descriptive names
-k8s_cluster_per_test = _create_scoped_cluster_fixture("function")
-k8s_cluster_per_class = _create_scoped_cluster_fixture("class")
-k8s_cluster_per_module = _create_scoped_cluster_fixture("module")
-k8s_cluster_per_session = _create_scoped_cluster_fixture("session")
-
-# Add docstrings to the convenience fixtures
-k8s_cluster_per_test.__doc__ = """
-Create a new Kubernetes cluster for each test function.
-
-This is equivalent to k8s_cluster_function but with a more descriptive name.
-"""
-
-k8s_cluster_per_class.__doc__ = """
-Create a new Kubernetes cluster for each test class.
-
-This is equivalent to k8s_cluster_class but with a more descriptive name.
-"""
-
-k8s_cluster_per_module.__doc__ = """
-Create a new Kubernetes cluster for each test module.
-
-This is equivalent to k8s_cluster_module but with a more descriptive name.
-"""
-
-k8s_cluster_per_session.__doc__ = """
-Create a single Kubernetes cluster for the entire test session.
-
-This is equivalent to k8s_cluster_session but with a more descriptive name.
-"""

@@ -30,15 +30,6 @@ from .kind.command_runner import KindCommandRunner, KubectlCommandRunner
 # Import fixtures for external use
 from .fixtures import (
     k8s_cluster,
-    k8s_cluster_session,
-    k8s_cluster_module,
-    k8s_cluster_class,
-    k8s_cluster_function,
-    k8s_cluster_factory,
-    k8s_cluster_per_test,
-    k8s_cluster_per_class,
-    k8s_cluster_per_module,
-    k8s_cluster_per_session,
     ClusterFixtureManager,
     KubernetesClient,
     k8s_client,
@@ -75,15 +66,6 @@ __all__ = [
     
     # Fixtures
     "k8s_cluster",
-    "k8s_cluster_session",
-    "k8s_cluster_module",
-    "k8s_cluster_class",
-    "k8s_cluster_function",
-    "k8s_cluster_factory",
-    "k8s_cluster_per_test",
-    "k8s_cluster_per_class",
-    "k8s_cluster_per_module",
-    "k8s_cluster_per_session",
     "ClusterFixtureManager",
     "KubernetesClient",
     "k8s_client",

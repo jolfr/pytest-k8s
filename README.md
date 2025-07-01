@@ -424,46 +424,39 @@ def test_with_custom_cluster(k8s_cluster):
     assert k8s_cluster.name == "custom-cluster"
 ```
 
-#### Available Cluster Fixtures
+#### Available Cluster Fixture
 
-Choose the appropriate fixture based on your testing needs:
+The `k8s_cluster` fixture provides flexible scope configuration:
 
 ```python
 # Default fixture (uses configured default scope)
 def test_default_scope(k8s_cluster):
     pass
 
-# Explicit scope fixtures
-def test_session_cluster(k8s_cluster_session):
+# Override scope via parametrize
+@pytest.mark.parametrize("k8s_cluster", [
+    {"scope": "session"}
+], indirect=True)
+def test_session_cluster(k8s_cluster):
     pass
 
-def test_module_cluster(k8s_cluster_module):
+@pytest.mark.parametrize("k8s_cluster", [
+    {"scope": "module"}
+], indirect=True)
+def test_module_cluster(k8s_cluster):
     pass
 
-def test_class_cluster(k8s_cluster_class):
+@pytest.mark.parametrize("k8s_cluster", [
+    {"scope": "class"}
+], indirect=True)
+def test_class_cluster(k8s_cluster):
     pass
 
-def test_function_cluster(k8s_cluster_function):
+@pytest.mark.parametrize("k8s_cluster", [
+    {"scope": "function"}
+], indirect=True)
+def test_function_cluster(k8s_cluster):
     pass
-
-# Descriptive aliases
-def test_per_session(k8s_cluster_per_session):
-    pass
-
-def test_per_module(k8s_cluster_per_module):
-    pass
-
-def test_per_class(k8s_cluster_per_class):
-    pass
-
-def test_per_test(k8s_cluster_per_test):
-    pass
-
-# Factory for multiple clusters
-def test_multiple_clusters(k8s_cluster_factory):
-    cluster1 = k8s_cluster_factory(name="cluster1")
-    cluster2 = k8s_cluster_factory(name="cluster2")
-    # Both clusters are automatically cleaned up
 ```
 
 ### Advanced Parametrize Examples

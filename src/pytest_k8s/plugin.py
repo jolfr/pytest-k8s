@@ -11,18 +11,7 @@ from typing import Any
 from .config import PluginConfig, set_plugin_config
 
 # Import fixtures to make them available
-from .fixtures.k8s_cluster import (
-    k8s_cluster,
-    k8s_cluster_session,
-    k8s_cluster_module,
-    k8s_cluster_class,
-    k8s_cluster_function,
-    k8s_cluster_factory,
-    k8s_cluster_per_test,
-    k8s_cluster_per_class,
-    k8s_cluster_per_module,
-    k8s_cluster_per_session,
-)
+from .fixtures.k8s_cluster import k8s_cluster
 
 from .fixtures.k8s_client import k8s_client
 
