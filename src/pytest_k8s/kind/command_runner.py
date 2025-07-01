@@ -10,6 +10,9 @@ import subprocess
 from typing import Dict, List, Optional, Union
 
 from .errors import KindClusterError, KindClusterTimeoutError
+from .loggers import KindLoggerFactory
+from .streaming import StreamingSubprocess
+from ..config import get_plugin_config
 
 logger = logging.getLogger(__name__)
 
@@ -230,7 +233,7 @@ class KindCommandRunner(CommandRunner):
     Specialized command runner for kind operations.
     
     This class provides kind-specific command execution with enhanced
-    error handling and validation.
+    error handling and validation, including real-time log streaming.
     """
     
     def __init__(self, default_timeout: int = 300):
@@ -238,6 +241,121 @@ class KindCommandRunner(CommandRunner):
         super().__init__(default_timeout)
         self._kind_available = None
         self._docker_available = None
+        self._streaming_subprocess = None
+        self._stdout_logger = None
+        self._stderr_logger = None
+        self._setup_streaming()
+    
+    def _setup_streaming(self) -> None:
+        """Set up streaming loggers based on plugin configuration."""
+        config = get_plugin_config()
+        
+        if config.kind_logging.stream_logs:
+            # Create loggers from configuration
+            self._stdout_logger, self._stderr_logger = KindLoggerFactory.create_loggers_from_config(
+                config.kind_logging
+            )
+            
+            # Create streaming subprocess
+            self._streaming_subprocess = StreamingSubprocess(
+                stdout_logger=self._stdout_logger,
+                stderr_logger=self._stderr_logger,
+            )
+    
+    def run(
+        self,
+        cmd: List[str],
+        stream_output: Optional[bool] = None,
+        timeout: Optional[int] = None,
+        **kwargs
+    ) -> subprocess.CompletedProcess:
+        """
+        Run a command with optional streaming output.
+        
+        Args:
+            cmd: Command to run as a list of strings
+            stream_output: Whether to stream output (overrides config default)
+            timeout: Command timeout in seconds
+            **kwargs: Additional arguments for run()
+            
+        Returns:
+            CompletedProcess instance
+            
+        Raises:
+            subprocess.CalledProcessError: If command fails and check=True
+            KindClusterTimeoutError: If command times out
+            KindClusterError: For other execution errors
+        """
+        # Determine if we should stream output
+        config = get_plugin_config()
+        should_stream = stream_output if stream_output is not None else config.kind_logging.stream_logs
+        
+        if should_stream and self._streaming_subprocess:
+            return self._run_with_streaming(cmd, timeout=timeout, **kwargs)
+        else:
+            return super().run(cmd, timeout=timeout, **kwargs)
+    
+    def _run_with_streaming(
+        self,
+        cmd: List[str],
+        timeout: Optional[int] = None,
+        check: bool = True,
+        env: Optional[Dict[str, str]] = None,
+        cwd: Optional[str] = None,
+        input_data: Optional[str] = None,
+    ) -> subprocess.CompletedProcess:
+        """
+        Run a command with streaming output.
+        
+        Args:
+            cmd: Command to run as a list of strings
+            timeout: Command timeout in seconds
+            check: Whether to raise on non-zero exit code
+            env: Environment variables for the command
+            cwd: Working directory for the command
+            input_data: Input data to send to the command
+            
+        Returns:
+            CompletedProcess instance
+            
+        Raises:
+            subprocess.CalledProcessError: If command fails and check=True
+            KindClusterTimeoutError: If command times out
+            KindClusterError: For other execution errors
+        """
+        timeout = timeout or self.default_timeout
+        
+        logger.debug(f"Running command with streaming: {' '.join(cmd)}")
+        if env:
+            logger.debug(f"Environment variables: {env}")
+        if cwd:
+            logger.debug(f"Working directory: {cwd}")
+        
+        try:
+            result = self._streaming_subprocess.run(
+                cmd=cmd,
+                timeout=timeout,
+                check=check,
+                env=env,
+                cwd=cwd,
+                input_data=input_data,
+            )
+            
+            return result
+            
+        except subprocess.CalledProcessError as e:
+            logger.error(f"Command failed: {' '.join(cmd)}")
+            logger.error(f"Exit code: {e.returncode}")
+            raise
+        except subprocess.TimeoutExpired as e:
+            logger.error(f"Command timed out after {timeout}s: {' '.join(cmd)}")
+            raise KindClusterTimeoutError(
+                f"Command timed out after {timeout} seconds: {' '.join(cmd)}",
+                timeout
+            )
+        except Exception as e:
+            logger.error(f"Unexpected error running command {' '.join(cmd)}: {e}")
+            raise KindClusterError(f"Command execution failed: {e}")
     
     def check_kind_available(self) -> bool:
         """

@@ -198,6 +198,48 @@ def test_configmap_data(k8s_client, k8s_namespace):
 
 ## Configuration
 
+### Kind Log Streaming
+
+Control how kind command output is logged and streamed:
+
+```python
+# pytest.ini or pyproject.toml
+[tool.pytest.ini_options]
+k8s_kind_stream_logs = true           # Enable/disable log streaming (default: true)
+k8s_kind_stdout_level = "INFO"        # Log level for stdout (DEBUG, INFO, WARNING, ERROR)
+k8s_kind_stderr_level = "WARNING"     # Log level for stderr (DEBUG, INFO, WARNING, ERROR)
+k8s_kind_log_format = "[KIND {stream}] {message}"  # Log message format
+```
+
+You can also configure these via command line:
+
+```bash
+# Disable log streaming
+pytest --k8s-no-kind-stream-logs
+
+# Set custom log levels
+pytest --k8s-kind-stdout-level=DEBUG --k8s-kind-stderr-level=ERROR
+
+# Custom log format
+pytest --k8s-kind-log-format="[CUSTOM {stream}] {message}"
+```
+
+### Configuration in conftest.py
+
+Override settings programmatically in your `conftest.py`:
+
+```python
+def pytest_configure(config):
+    # Disable streaming in CI environments
+    if os.getenv("CI"):
+        config.option.k8s_kind_stream_logs = False
+    
+    # More verbose logging for development
+    if os.getenv("DEBUG"):
+        config.option.k8s_kind_stdout_level = "DEBUG"
+        config.option.k8s_kind_stderr_level = "DEBUG"
+```
+
 ### Cluster Sharing
 
 Control how clusters are shared across tests:
