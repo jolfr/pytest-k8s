@@ -11,6 +11,9 @@ dependencies = [
     "pytest>=8.4.1",
     "PyYAML>=6.0",
 ]
+classifiers = [
+    "Framework :: Pytest",
+]
 
 [build-system]
 requires = ["hatchling"]
@@ -25,3 +28,6 @@ addopts = [
 dev = [
     "pytest-cov>=6.2.1",
 ]
+
+[project.entry-points.pytest11]
+pytest_k8s = "pytest_k8s"
