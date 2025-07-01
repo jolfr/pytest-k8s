@@ -36,23 +36,23 @@ def pytest_addoption(parser: pytest.Parser) -> None:
     )
     
     group.addoption(
-        "--k8s-kind-stdout-level",
+        "--k8s-kind-log-level",
         default="INFO",
         choices=["DEBUG", "INFO", "WARNING", "ERROR"],
-        help="Log level for kind stdout (default: INFO)"
-    )
-    
-    group.addoption(
-        "--k8s-kind-stderr-level",
-        default="WARNING", 
-        choices=["DEBUG", "INFO", "WARNING", "ERROR"],
-        help="Log level for kind stderr (default: WARNING)"
+        help="Log level for all kind messages (default: INFO)"
     )
     
     group.addoption(
         "--k8s-kind-log-format",
-        default="[KIND {stream}] {message}",
-        help="Format template for kind log messages (default: '[KIND {stream}] {message}')"
+        default="[KIND] {message}",
+        help="Format template for kind log messages (default: '[KIND] {message}')"
+    )
+    
+    group.addoption(
+        "--k8s-kind-include-stream-info",
+        action="store_true",
+        default=False,
+        help="Include stream info (STDOUT/STDERR) in log messages for debugging"
     )
 
 
@@ -129,14 +129,15 @@ def pytest_report_header(config: pytest.Config) -> str:
         Header string for pytest output
     """
     from .config import get_plugin_config
+    import logging
     
     plugin_config = get_plugin_config()
     
     if plugin_config.kind_logging.stream_logs:
+        level_name = logging.getLevelName(plugin_config.kind_logging.log_level)
         return (
             f"pytest-k8s: kind log streaming enabled "
-            f"(stdout: {plugin_config.kind_logging.stdout_level}, "
-            f"stderr: {plugin_config.kind_logging.stderr_level})"
+            f"(level: {level_name})"
         )
     else:
         return "pytest-k8s: kind log streaming disabled"

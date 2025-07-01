@@ -1,82 +1,89 @@
 """
 Custom loggers for kind command output streaming.
 
-This module provides specialized loggers for streaming stdout and stderr
-from kind commands with appropriate prefixes and formatting.
+This module provides a unified logger for streaming stdout and stderr
+from kind commands with consistent formatting and log levels.
 """
 
 import logging
 from typing import Optional
 
 
-class KindStreamLogger:
+class KindLogger:
     """
-    Custom logger for kind command output streams.
+    Unified logger for kind command output streams.
     
-    This logger handles streaming output from kind commands with
-    configurable prefixes and log levels.
+    This logger handles streaming output from both stdout and stderr
+    of kind commands with consistent formatting and log levels.
     """
     
     def __init__(
         self,
-        stream_name: str,
-        level: int,
-        format_template: str = "[KIND {stream}] {message}",
-        logger_name: Optional[str] = None,
+        level: int = logging.INFO,
+        format_template: str = "[KIND] {message}",
+        logger_name: str = "pytest_k8s.kind",
+        include_stream_info: bool = False,
     ):
         """
-        Initialize the stream logger.
+        Initialize the unified kind logger.
         
         Args:
-            stream_name: Name of the stream (e.g., "STDOUT", "STDERR")
-            level: Logging level for this stream
+            level: Logging level for all kind messages
             format_template: Format template for log messages
-            logger_name: Custom logger name (defaults to pytest_k8s.kind.{stream_name})
+            logger_name: Logger name for hierarchical logging
+            include_stream_info: Whether to include stream info in messages
         """
-        self.stream_name = stream_name.upper()
         self.level = level
         self.format_template = format_template
+        self.include_stream_info = include_stream_info
         
         # Create logger with hierarchical name
-        if logger_name is None:
-            logger_name = f"pytest_k8s.kind.{self.stream_name.lower()}"
-        
         self.logger = logging.getLogger(logger_name)
         
         # Ensure the logger propagates to the root logger
         self.logger.propagate = True
     
-    def log_line(self, line: str) -> None:
+    def log_line(self, line: str, stream_name: Optional[str] = None) -> None:
         """
         Log a single line of output.
         
         Args:
             line: Line of output to log
+            stream_name: Name of the stream (for debugging purposes)
         """
         if not line.strip():
             return
         
         # Check if logging is enabled for this level
         if self.logger.isEnabledFor(self.level):
-            formatted_message = self.format_template.format(
-                stream=self.stream_name,
-                message=line.rstrip()
-            )
+            # Format the message
+            if self.include_stream_info and stream_name:
+                # Include stream info for debugging
+                formatted_message = self.format_template.format(
+                    message=f"[{stream_name.upper()}] {line.rstrip()}"
+                )
+            else:
+                # Standard unified format
+                formatted_message = self.format_template.format(
+                    message=line.rstrip()
+                )
+            
             self.logger.log(self.level, formatted_message)
     
-    def log_lines(self, lines: str) -> None:
+    def log_lines(self, lines: str, stream_name: Optional[str] = None) -> None:
         """
         Log multiple lines of output.
         
         Args:
             lines: Multi-line string to log
+            stream_name: Name of the stream (for debugging purposes)
         """
         for line in lines.splitlines():
-            self.log_line(line)
+            self.log_line(line, stream_name)
     
     def is_enabled(self) -> bool:
         """
-        Check if logging is enabled for this stream's level.
+        Check if logging is enabled for this logger's level.
         
         Returns:
             True if logging is enabled, False otherwise
@@ -86,151 +93,91 @@ class KindStreamLogger:
     def __repr__(self) -> str:
         """String representation of the logger."""
         return (
-            f"KindStreamLogger("
-            f"stream={self.stream_name}, "
+            f"KindLogger("
             f"level={logging.getLevelName(self.level)}, "
-            f"logger={self.logger.name}"
+            f"logger={self.logger.name}, "
+            f"include_stream_info={self.include_stream_info}"
             f")"
-        )
-
-
-class KindStdoutLogger(KindStreamLogger):
-    """
-    Specialized logger for kind stdout output.
-    
-    This logger is specifically configured for handling stdout
-    from kind commands with appropriate formatting.
-    """
-    
-    def __init__(
-        self,
-        level: int = logging.INFO,
-        format_template: str = "[KIND STDOUT] {message}",
-    ):
-        """
-        Initialize the stdout logger.
-        
-        Args:
-            level: Logging level for stdout messages
-            format_template: Format template for stdout messages
-        """
-        super().__init__(
-            stream_name="STDOUT",
-            level=level,
-            format_template=format_template,
-            logger_name="pytest_k8s.kind.stdout"
-        )
-
-
-class KindStderrLogger(KindStreamLogger):
-    """
-    Specialized logger for kind stderr output.
-    
-    This logger is specifically configured for handling stderr
-    from kind commands with appropriate formatting.
-    """
-    
-    def __init__(
-        self,
-        level: int = logging.WARNING,
-        format_template: str = "[KIND STDERR] {message}",
-    ):
-        """
-        Initialize the stderr logger.
-        
-        Args:
-            level: Logging level for stderr messages
-            format_template: Format template for stderr messages
-        """
-        super().__init__(
-            stream_name="STDERR",
-            level=level,
-            format_template=format_template,
-            logger_name="pytest_k8s.kind.stderr"
         )
 
 
 class KindLoggerFactory:
     """
-    Factory for creating kind stream loggers with consistent configuration.
+    Factory for creating kind loggers with consistent configuration.
     
     This factory ensures that all kind loggers are created with
     consistent settings based on the plugin configuration.
     """
     
     @staticmethod
-    def create_stdout_logger(
+    def create_logger(
         level: int = logging.INFO,
-        format_template: str = "[KIND STDOUT] {message}",
-    ) -> KindStdoutLogger:
+        format_template: str = "[KIND] {message}",
+        include_stream_info: bool = False,
+    ) -> KindLogger:
         """
-        Create a stdout logger.
+        Create a unified kind logger.
         
         Args:
-            level: Logging level for stdout messages
-            format_template: Format template for stdout messages
+            level: Logging level for kind messages
+            format_template: Format template for log messages
+            include_stream_info: Whether to include stream info in messages
             
         Returns:
-            Configured KindStdoutLogger instance
+            Configured KindLogger instance
         """
-        return KindStdoutLogger(level=level, format_template=format_template)
+        return KindLogger(
+            level=level,
+            format_template=format_template,
+            include_stream_info=include_stream_info
+        )
     
     @staticmethod
-    def create_stderr_logger(
-        level: int = logging.WARNING,
-        format_template: str = "[KIND STDERR] {message}",
-    ) -> KindStderrLogger:
+    def create_logger_from_config(config) -> KindLogger:
         """
-        Create a stderr logger.
-        
-        Args:
-            level: Logging level for stderr messages
-            format_template: Format template for stderr messages
-            
-        Returns:
-            Configured KindStderrLogger instance
-        """
-        return KindStderrLogger(level=level, format_template=format_template)
-    
-    @staticmethod
-    def create_loggers_from_config(config) -> tuple[KindStdoutLogger, KindStderrLogger]:
-        """
-        Create stdout and stderr loggers from configuration.
+        Create a kind logger from configuration.
         
         Args:
             config: KindLoggingConfig instance
             
         Returns:
-            Tuple of (stdout_logger, stderr_logger)
+            Configured KindLogger instance
         """
-        stdout_logger = KindLoggerFactory.create_stdout_logger(
-            level=config.stdout_level,
-            format_template=config.log_format.replace("{stream}", "STDOUT")
+        return KindLoggerFactory.create_logger(
+            level=config.log_level,
+            format_template=config.log_format,
+            include_stream_info=config.include_stream_info
         )
-        
-        stderr_logger = KindLoggerFactory.create_stderr_logger(
-            level=config.stderr_level,
-            format_template=config.log_format.replace("{stream}", "STDERR")
-        )
-        
-        return stdout_logger, stderr_logger
 
 
-def get_kind_logger(stream_name: str) -> logging.Logger:
+def get_kind_logger() -> logging.Logger:
     """
-    Get a kind logger by stream name.
+    Get the unified kind logger.
+    
+    Returns:
+        Logger instance for kind operations
+    """
+    return logging.getLogger("pytest_k8s.kind")
+
+
+# Backward compatibility - deprecated functions
+def get_kind_logger_by_stream(stream_name: str) -> logging.Logger:
+    """
+    Get a kind logger by stream name (deprecated).
     
     Args:
         stream_name: Name of the stream ("stdout" or "stderr")
         
     Returns:
-        Logger instance for the specified stream
+        Logger instance for kind operations
         
-    Raises:
-        ValueError: If stream_name is not valid
+    Note:
+        This function is deprecated. Use get_kind_logger() instead.
     """
-    stream_name = stream_name.lower()
-    if stream_name not in ("stdout", "stderr"):
-        raise ValueError(f"Invalid stream name: {stream_name}. Must be 'stdout' or 'stderr'")
-    
-    return logging.getLogger(f"pytest_k8s.kind.{stream_name}")
+    import warnings
+    warnings.warn(
+        "get_kind_logger_by_stream is deprecated. Use get_kind_logger() instead.",
+        DeprecationWarning,
+        stacklevel=2
+    )
+    return get_kind_logger()

@@ -20,23 +20,23 @@ class KindLoggingConfig:
     def __init__(
         self,
         stream_logs: bool = True,
-        stdout_level: str = "INFO",
-        stderr_level: str = "WARNING",
-        log_format: str = "[KIND {stream}] {message}",
+        log_level: str = "INFO",
+        log_format: str = "[KIND] {message}",
+        include_stream_info: bool = False,
     ):
         """
         Initialize kind logging configuration.
         
         Args:
             stream_logs: Whether to enable real-time log streaming
-            stdout_level: Log level for stdout messages (DEBUG, INFO, WARNING, ERROR)
-            stderr_level: Log level for stderr messages (DEBUG, INFO, WARNING, ERROR)
+            log_level: Log level for all kind messages (DEBUG, INFO, WARNING, ERROR)
             log_format: Format template for log messages
+            include_stream_info: Whether to include stream info in log messages
         """
         self.stream_logs = stream_logs
-        self.stdout_level = self._parse_log_level(stdout_level)
-        self.stderr_level = self._parse_log_level(stderr_level)
+        self.log_level = self._parse_log_level(log_level)
         self.log_format = log_format
+        self.include_stream_info = include_stream_info
     
     @staticmethod
     def _parse_log_level(level: str) -> int:
@@ -81,15 +81,15 @@ class KindLoggingConfig:
         """
         # Get options using getoption method with defaults
         stream_logs = pytest_config.getoption("k8s_kind_stream_logs", True)
-        stdout_level = pytest_config.getoption("k8s_kind_stdout_level", "INFO")
-        stderr_level = pytest_config.getoption("k8s_kind_stderr_level", "WARNING")
-        log_format = pytest_config.getoption("k8s_kind_log_format", "[KIND {stream}] {message}")
+        log_level = pytest_config.getoption("k8s_kind_log_level", "INFO")
+        log_format = pytest_config.getoption("k8s_kind_log_format", "[KIND] {message}")
+        include_stream_info = pytest_config.getoption("k8s_kind_include_stream_info", False)
         
         return cls(
             stream_logs=stream_logs,
-            stdout_level=stdout_level,
-            stderr_level=stderr_level,
+            log_level=log_level,
             log_format=log_format,
+            include_stream_info=include_stream_info,
         )
     
     @classmethod
@@ -107,9 +107,9 @@ class KindLoggingConfig:
         return (
             f"KindLoggingConfig("
             f"stream_logs={self.stream_logs}, "
-            f"stdout_level={logging.getLevelName(self.stdout_level)}, "
-            f"stderr_level={logging.getLevelName(self.stderr_level)}, "
-            f"log_format='{self.log_format}'"
+            f"log_level={logging.getLevelName(self.log_level)}, "
+            f"log_format='{self.log_format}', "
+            f"include_stream_info={self.include_stream_info}"
             f")"
         )
 

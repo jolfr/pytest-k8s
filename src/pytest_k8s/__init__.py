@@ -23,7 +23,7 @@ from .plugin import (
 from .config import KindLoggingConfig, PluginConfig, get_plugin_config, set_plugin_config
 
 # Import kind utilities for external use
-from .kind.loggers import KindStreamLogger, KindStdoutLogger, KindStderrLogger, KindLoggerFactory
+from .kind.loggers import KindLogger, KindLoggerFactory, get_kind_logger
 from .kind.streaming import StreamingSubprocess, create_streaming_subprocess
 from .kind.command_runner import KindCommandRunner, KubectlCommandRunner
 
@@ -43,10 +43,9 @@ __all__ = [
     "set_plugin_config",
     
     # Loggers
-    "KindStreamLogger",
-    "KindStdoutLogger", 
-    "KindStderrLogger",
+    "KindLogger",
     "KindLoggerFactory",
+    "get_kind_logger",
     
     # Streaming
     "StreamingSubprocess",

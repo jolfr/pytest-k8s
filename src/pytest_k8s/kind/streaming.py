@@ -11,7 +11,7 @@ import time
 from typing import Optional, TextIO, Callable, List, Any
 from io import StringIO
 
-from .loggers import KindStreamLogger
+from .loggers import KindLogger
 
 
 class StreamReader:
@@ -19,13 +19,14 @@ class StreamReader:
     Reads from a subprocess stream in a separate thread.
     
     This class handles reading from stdout or stderr streams
-    in real-time and forwards the output to a logger.
+    in real-time and forwards the output to a unified logger.
     """
     
     def __init__(
         self,
         stream: TextIO,
-        logger: KindStreamLogger,
+        logger: KindLogger,
+        stream_name: str,
         name: str = "StreamReader",
     ):
         """
@@ -33,11 +34,13 @@ class StreamReader:
         
         Args:
             stream: The stream to read from (stdout or stderr)
-            logger: Logger to send output to
+            logger: Unified logger to send output to
+            stream_name: Name of the stream (stdout or stderr)
             name: Name for the reader thread
         """
         self.stream = stream
         self.logger = logger
+        self.stream_name = stream_name
         self.name = name
         self.thread: Optional[threading.Thread] = None
         self.running = False
@@ -52,7 +55,7 @@ class StreamReader:
         self.running = True
         self.thread = threading.Thread(
             target=self._read_stream,
-            name=f"{self.name}-{self.logger.stream_name}",
+            name=f"{self.name}-{self.stream_name}",
             daemon=True
         )
         self.thread.start()
@@ -78,12 +81,12 @@ class StreamReader:
                 
                 # Log the line if logger is enabled
                 if self.logger.is_enabled():
-                    self.logger.log_line(line)
+                    self.logger.log_line(line, self.stream_name)
                 
         except Exception as e:
             # Log any errors in reading
             if self.logger.is_enabled():
-                self.logger.log_line(f"Error reading stream: {e}")
+                self.logger.log_line(f"Error reading stream: {e}", self.stream_name)
         finally:
             self.running = False
     
@@ -113,23 +116,20 @@ class LoggingStreamHandler:
     Handles streaming output from subprocess commands with logging.
     
     This class coordinates multiple stream readers and manages
-    the overall streaming process for a subprocess.
+    the overall streaming process for a subprocess using a unified logger.
     """
     
     def __init__(
         self,
-        stdout_logger: Optional[KindStreamLogger] = None,
-        stderr_logger: Optional[KindStreamLogger] = None,
+        logger: Optional[KindLogger] = None,
     ):
         """
         Initialize the stream handler.
         
         Args:
-            stdout_logger: Logger for stdout output
-            stderr_logger: Logger for stderr output
+            logger: Unified logger for both stdout and stderr output
         """
-        self.stdout_logger = stdout_logger
-        self.stderr_logger = stderr_logger
+        self.logger = logger
         self.stdout_reader: Optional[StreamReader] = None
         self.stderr_reader: Optional[StreamReader] = None
     
@@ -146,19 +146,21 @@ class LoggingStreamHandler:
             command_name: Name of the command for logging context
         """
         # Create and start stdout reader
-        if process.stdout and self.stdout_logger:
+        if process.stdout and self.logger:
             self.stdout_reader = StreamReader(
                 stream=process.stdout,
-                logger=self.stdout_logger,
+                logger=self.logger,
+                stream_name="stdout",
                 name=f"{command_name}-stdout"
             )
             self.stdout_reader.start()
         
         # Create and start stderr reader
-        if process.stderr and self.stderr_logger:
+        if process.stderr and self.logger:
             self.stderr_reader = StreamReader(
                 stream=process.stderr,
-                logger=self.stderr_logger,
+                logger=self.logger,
+                stream_name="stderr",
                 name=f"{command_name}-stderr"
             )
             self.stderr_reader.start()
@@ -215,23 +217,20 @@ class StreamingSubprocess:
     Wrapper for subprocess execution with real-time streaming.
     
     This class provides a high-level interface for running subprocesses
-    with real-time output streaming and logging.
+    with real-time output streaming and logging using a unified logger.
     """
     
     def __init__(
         self,
-        stdout_logger: Optional[KindStreamLogger] = None,
-        stderr_logger: Optional[KindStreamLogger] = None,
+        logger: Optional[KindLogger] = None,
     ):
         """
         Initialize the streaming subprocess wrapper.
         
         Args:
-            stdout_logger: Logger for stdout output
-            stderr_logger: Logger for stderr output
+            logger: Unified logger for both stdout and stderr output
         """
-        self.stdout_logger = stdout_logger
-        self.stderr_logger = stderr_logger
+        self.logger = logger
     
     def run(
         self,
@@ -261,14 +260,13 @@ class StreamingSubprocess:
             subprocess.TimeoutExpired: If command times out
         """
         # Determine if we should capture output
-        capture_stdout = self.stdout_logger is not None
-        capture_stderr = self.stderr_logger is not None
+        capture_output = self.logger is not None
         
         # Start the process
         process = subprocess.Popen(
             cmd,
-            stdout=subprocess.PIPE if capture_stdout else None,
-            stderr=subprocess.PIPE if capture_stderr else None,
+            stdout=subprocess.PIPE if capture_output else None,
+            stderr=subprocess.PIPE if capture_output else None,
             stdin=subprocess.PIPE if input_data else None,
             text=True,
             env=env,
@@ -276,10 +274,7 @@ class StreamingSubprocess:
         )
         
         # Set up streaming
-        stream_handler = LoggingStreamHandler(
-            stdout_logger=self.stdout_logger,
-            stderr_logger=self.stderr_logger,
-        )
+        stream_handler = LoggingStreamHandler(logger=self.logger)
         
         try:
             # Start streaming output
@@ -332,20 +327,15 @@ class StreamingSubprocess:
 
 
 def create_streaming_subprocess(
-    stdout_logger: Optional[KindStreamLogger] = None,
-    stderr_logger: Optional[KindStreamLogger] = None,
+    logger: Optional[KindLogger] = None,
 ) -> StreamingSubprocess:
     """
     Create a streaming subprocess instance.
     
     Args:
-        stdout_logger: Logger for stdout output
-        stderr_logger: Logger for stderr output
+        logger: Unified logger for both stdout and stderr output
         
     Returns:
         Configured StreamingSubprocess instance
     """
-    return StreamingSubprocess(
-        stdout_logger=stdout_logger,
-        stderr_logger=stderr_logger,
-    )
+    return StreamingSubprocess(logger=logger)

@@ -242,24 +242,22 @@ class KindCommandRunner(CommandRunner):
         self._kind_available = None
         self._docker_available = None
         self._streaming_subprocess = None
-        self._stdout_logger = None
-        self._stderr_logger = None
+        self._logger = None
         self._setup_streaming()
     
     def _setup_streaming(self) -> None:
-        """Set up streaming loggers based on plugin configuration."""
+        """Set up streaming logger based on plugin configuration."""
         config = get_plugin_config()
         
         if config.kind_logging.stream_logs:
-            # Create loggers from configuration
-            self._stdout_logger, self._stderr_logger = KindLoggerFactory.create_loggers_from_config(
+            # Create unified logger from configuration
+            self._logger = KindLoggerFactory.create_logger_from_config(
                 config.kind_logging
             )
             
             # Create streaming subprocess
             self._streaming_subprocess = StreamingSubprocess(
-                stdout_logger=self._stdout_logger,
-                stderr_logger=self._stderr_logger,
+                logger=self._logger,
             )
     
     def run(
