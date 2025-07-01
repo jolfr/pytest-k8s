@@ -19,6 +19,9 @@ build-backend = "hatchling.build"
 [tool.pytest.ini_options]
 addopts = [
     "--import-mode=importlib",
+    "-v",                    # Verbose output
+    "--capture=no",          # No output capturing
+    "--log-cli-level=INFO",  # Show logs at INFO level and above
 ]
 
 [dependency-groups]
