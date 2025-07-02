@@ -65,9 +65,9 @@ class ClusterFixtureManager:
 
         # Set defaults from plugin config if not specified
         if timeout is None:
-            timeout = 300  # Default timeout
+            timeout = plugin_config.cluster.default_timeout
         if keep_cluster is None:
-            keep_cluster = False
+            keep_cluster = plugin_config.cluster.default_keep_cluster
 
         # Create cluster configuration
         cluster_config = {}

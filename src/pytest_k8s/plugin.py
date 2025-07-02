@@ -65,6 +65,27 @@ def pytest_addoption(parser: pytest.Parser) -> None:
         help="Default scope for k8s_cluster fixture (default: session)",
     )
 
+    group.addoption(
+        "--k8s-cluster-timeout",
+        type=int,
+        default=300,
+        help="Default timeout in seconds for cluster operations (default: 300)",
+    )
+
+    group.addoption(
+        "--k8s-cluster-keep",
+        action="store_true",
+        default=False,
+        help="Keep clusters after tests complete by default",
+    )
+
+    group.addoption(
+        "--k8s-no-cluster-keep",
+        action="store_true",
+        default=False,
+        help="Explicitly disable keeping clusters (overrides --k8s-cluster-keep)",
+    )
+
 
 def pytest_configure(config: pytest.Config) -> None:
     """
@@ -79,6 +100,10 @@ def pytest_configure(config: pytest.Config) -> None:
     # Handle conflicting stream log options
     if config.getoption("k8s_no_kind_stream_logs"):
         config.option.k8s_kind_stream_logs = False
+
+    # Handle conflicting keep cluster options
+    if config.getoption("k8s_no_cluster_keep"):
+        config.option.k8s_cluster_keep = False
 
     # Create and set global plugin configuration
     plugin_config = PluginConfig(config)

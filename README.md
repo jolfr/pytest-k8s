@@ -516,6 +516,35 @@ def test_slow_operation(k8s_cluster):
     pass
 ```
 
+### Cluster Configuration Options
+
+Configure default behavior for cluster creation:
+
+```toml
+[tool.pytest.ini_options]
+addopts = [
+    "--k8s-cluster-scope=session",               # Default cluster scope
+    "--k8s-cluster-timeout=300",                 # Default timeout in seconds (default: 300)
+    "--k8s-cluster-keep",                        # Keep clusters after tests by default
+]
+```
+
+Command line options:
+
+```bash
+# Set custom timeout for cluster operations
+pytest --k8s-cluster-timeout=600
+
+# Keep clusters after tests complete (useful for debugging)
+pytest --k8s-cluster-keep
+
+# Explicitly disable keeping clusters (overrides --k8s-cluster-keep)
+pytest --k8s-no-cluster-keep
+
+# Combine multiple options
+pytest --k8s-cluster-scope=function --k8s-cluster-timeout=600 --k8s-cluster-keep
+```
+
 ### Kind Log Streaming
 
 Control how kind command output is logged and streamed:

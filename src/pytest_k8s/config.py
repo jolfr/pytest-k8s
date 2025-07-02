@@ -126,14 +126,20 @@ class ClusterConfig:
     def __init__(
         self,
         default_scope: str = "session",
+        default_timeout: int = 300,
+        default_keep_cluster: bool = False,
     ):
         """
         Initialize cluster configuration.
 
         Args:
             default_scope: Default scope for k8s_cluster fixture
+            default_timeout: Default timeout in seconds for cluster operations
+            default_keep_cluster: Default for keeping clusters after tests
         """
         self.default_scope = default_scope
+        self.default_timeout = default_timeout
+        self.default_keep_cluster = default_keep_cluster
 
     @classmethod
     def from_pytest_config(cls, pytest_config: Any) -> "ClusterConfig":
@@ -147,9 +153,17 @@ class ClusterConfig:
             ClusterConfig instance
         """
         default_scope = pytest_config.getoption("k8s_cluster_scope", "session")
+        default_timeout = pytest_config.getoption("k8s_cluster_timeout", 300)
+        
+        # Handle conflicting keep cluster options
+        default_keep_cluster = pytest_config.getoption("k8s_cluster_keep", False)
+        if pytest_config.getoption("k8s_no_cluster_keep", False):
+            default_keep_cluster = False
 
         return cls(
             default_scope=default_scope,
+            default_timeout=default_timeout,
+            default_keep_cluster=default_keep_cluster,
         )
 
     @classmethod
@@ -164,7 +178,13 @@ class ClusterConfig:
 
     def __repr__(self) -> str:
         """String representation of configuration."""
-        return f"ClusterConfig(default_scope='{self.default_scope}')"
+        return (
+            f"ClusterConfig("
+            f"default_scope='{self.default_scope}', "
+            f"default_timeout={self.default_timeout}, "
+            f"default_keep_cluster={self.default_keep_cluster}"
+            f")"
+        )
 
 
 class PluginConfig:

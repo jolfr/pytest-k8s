@@ -20,8 +20,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Comprehensive test examples**: Added `tests/test_examples.py` with real-world usage examples
 - **Configurable cluster scope**: Added support for configuring default cluster scope via command line and configuration files
 - **Scope override via parametrize**: Added ability to override cluster scope per test using `pytest.mark.parametrize`
-- **New command line option**: `--k8s-cluster-scope` to set default cluster scope (function, class, module, session)
-- **Enhanced cluster configuration**: Added `ClusterConfig` class for managing cluster-specific settings
+- **New command line options**: 
+  - `--k8s-cluster-scope` to set default cluster scope (function, class, module, session)
+  - `--k8s-cluster-timeout` to set default timeout for cluster operations (default: 300 seconds)
+  - `--k8s-cluster-keep` to keep clusters after tests complete by default
+  - `--k8s-no-cluster-keep` to explicitly disable keeping clusters (overrides --k8s-cluster-keep)
+- **Enhanced cluster configuration**: Added `ClusterConfig` class for managing cluster-specific settings including:
+  - `default_scope` - Default fixture scope for clusters
+  - `default_timeout` - Default timeout in seconds for cluster operations
+  - `default_keep_cluster` - Default behavior for keeping clusters after tests
+- **Configuration-based defaults**: Cluster creation now uses configuration values instead of hardcoded defaults
 - **Comprehensive scope testing**: Added extensive test coverage for all scope configurations and override scenarios
 
 ### Enhanced
