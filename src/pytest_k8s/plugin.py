@@ -8,6 +8,7 @@ command-line options, configuration management, and plugin hooks.
 import pytest
 
 from .config import PluginConfig, set_plugin_config
+from .cleanup import get_cleanup_manager
 
 # Import fixtures to make them available
 
@@ -86,6 +87,35 @@ def pytest_addoption(parser: pytest.Parser) -> None:
         help="Explicitly disable keeping clusters (overrides --k8s-cluster-keep)",
     )
 
+    # Cleanup options
+    group.addoption(
+        "--k8s-cleanup-on-interrupt",
+        action="store_true",
+        default=True,
+        help="Clean up clusters on interrupt signals (default: True)",
+    )
+
+    group.addoption(
+        "--k8s-no-cleanup-on-interrupt",
+        action="store_true",
+        default=False,
+        help="Disable cleanup on interrupt signals",
+    )
+
+    group.addoption(
+        "--k8s-cleanup-orphaned",
+        action="store_true",
+        default=True,
+        help="Clean up orphaned clusters from previous runs (default: True)",
+    )
+
+    group.addoption(
+        "--k8s-no-cleanup-orphaned",
+        action="store_true",
+        default=False,
+        help="Disable cleanup of orphaned clusters",
+    )
+
 
 def pytest_configure(config: pytest.Config) -> None:
     """
@@ -148,8 +178,42 @@ def pytest_sessionfinish(session: pytest.Session, exitstatus: int) -> None:
         session: Pytest session object
         exitstatus: Exit status of the test run
     """
-    # Any session cleanup needed
-    pass
+    # Ensure all clusters are cleaned up at session end
+    cleanup_manager = get_cleanup_manager()
+    cleanup_manager.force_cleanup_all()
+
+
+@pytest.hookimpl(tryfirst=True)
+def pytest_keyboard_interrupt(excinfo) -> None:
+    """
+    Handle keyboard interrupt (Ctrl+C) by cleaning up clusters.
+
+    Args:
+        excinfo: Exception info for the keyboard interrupt
+    """
+    import logging
+    logger = logging.getLogger(__name__)
+    
+    logger.info("Keyboard interrupt received, cleaning up clusters...")
+    cleanup_manager = get_cleanup_manager()
+    cleanup_manager.force_cleanup_all()
+
+
+@pytest.hookimpl(tryfirst=True)
+def pytest_internalerror(excrepr, excinfo) -> None:
+    """
+    Handle internal pytest errors by cleaning up clusters.
+
+    Args:
+        excrepr: Exception representation
+        excinfo: Exception info
+    """
+    import logging
+    logger = logging.getLogger(__name__)
+    
+    logger.error("Internal pytest error occurred, cleaning up clusters...")
+    cleanup_manager = get_cleanup_manager()
+    cleanup_manager.force_cleanup_all()
 
 
 # Plugin metadata

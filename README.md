@@ -7,9 +7,11 @@ A pytest plugin that provides fixtures for testing Python applications with Kube
 - 🚀 **Automatic cluster management** - Spins up and tears down kind clusters automatically
 - 🧪 **pytest fixtures** - Clean, intuitive fixtures for Kubernetes resources
 - 🔧 **Python Kubernetes client integration** - Works seamlessly with the official Kubernetes Python client
-- 🧹 **Automatic cleanup** - Resources are automatically cleaned up after tests
+- 🧹 **Robust cleanup** - Multiple cleanup mechanisms ensure clusters are always cleaned up
 - ⚙️ **Configurable cluster sharing** - Share clusters across tests, classes, or sessions
-- 🛡️ **Robust error handling** - Gracefully handles cluster creation failures
+- 🛡️ **Robust error handling** - Gracefully handles cluster creation failures and interrupts
+- 🔒 **Signal handling** - Handles interrupts (Ctrl+C) and crashes with automatic cleanup
+- 💾 **Persistent state tracking** - Recovers and cleans up orphaned clusters from previous runs
 
 ## Installation
 
@@ -570,6 +572,65 @@ pytest --k8s-kind-log-level=DEBUG
 
 # Custom log format
 pytest --k8s-kind-log-format="[CUSTOM] {message}"
+```
+
+### Robust Cleanup Mechanism
+
+pytest-k8s includes a comprehensive cleanup system that ensures clusters are always properly cleaned up, even in error conditions:
+
+#### Multiple Cleanup Layers
+
+1. **Fixture Cleanup** - Standard pytest fixture cleanup
+2. **Signal Handlers** - Handles interrupts (Ctrl+C, SIGTERM)
+3. **Atexit Handlers** - Cleanup on normal program termination
+4. **Persistent State Tracking** - Recovers orphaned clusters from crashed sessions
+
+#### Cleanup Configuration
+
+```toml
+[tool.pytest.ini_options]
+addopts = [
+    "--k8s-cleanup-on-interrupt",                # Clean up on interrupt signals (default: true)
+    "--k8s-cleanup-orphaned",                    # Clean up orphaned clusters (default: true)
+]
+```
+
+Command line options:
+
+```bash
+# Disable cleanup on interrupt (not recommended)
+pytest --k8s-no-cleanup-on-interrupt
+
+# Disable orphaned cluster cleanup
+pytest --k8s-no-cleanup-orphaned
+```
+
+#### How It Works
+
+The cleanup system provides multiple safety nets:
+
+- **Signal Handling**: Catches SIGINT (Ctrl+C) and SIGTERM signals to ensure cleanup happens even when tests are interrupted
+- **Persistent Tracking**: Maintains a state file (`~/.pytest-k8s/active_clusters.json`) to track active clusters across sessions
+- **Orphaned Cleanup**: On startup, automatically detects and cleans up clusters from previous sessions that crashed or were forcibly terminated
+- **Context Managers**: Uses context managers for guaranteed cleanup even if exceptions occur
+- **Multiple Finalizers**: Registers multiple cleanup mechanisms to ensure clusters are deleted
+
+#### Emergency Cleanup
+
+If you need to manually clean up all clusters:
+
+```python
+from pytest_k8s.cleanup import cleanup_all_clusters
+
+# Force cleanup of all tracked clusters
+cleanup_all_clusters()
+```
+
+Or use the command line:
+
+```bash
+# Clean up any orphaned clusters
+python -c "from pytest_k8s.cleanup import cleanup_all_clusters; cleanup_all_clusters()"
 ```
 
 ### Configuration in conftest.py

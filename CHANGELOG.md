@@ -8,6 +8,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- **Robust cleanup mechanism**: Comprehensive cleanup system that ensures clusters are always properly cleaned up
+  - **Signal handlers**: Catches SIGINT (Ctrl+C) and SIGTERM signals for graceful cleanup during interrupts
+  - **Persistent state tracking**: Maintains state file (`~/.pytest-k8s/active_clusters.json`) to track active clusters
+  - **Orphaned cluster recovery**: Automatically detects and cleans up clusters from previous crashed sessions
+  - **Multiple cleanup layers**: Fixture cleanup, signal handlers, atexit handlers, and context managers
+  - **Emergency cleanup function**: `cleanup_all_clusters()` for manual cleanup when needed
+  - **New command line options**:
+    - `--k8s-cleanup-on-interrupt` to enable cleanup on interrupt signals (default: true)
+    - `--k8s-no-cleanup-on-interrupt` to disable cleanup on interrupt signals
+    - `--k8s-cleanup-orphaned` to enable orphaned cluster cleanup (default: true)
+    - `--k8s-no-cleanup-orphaned` to disable orphaned cluster cleanup
 - **k8s_client fixture**: New comprehensive Kubernetes API client fixture with direct access to all API clients
   - `CoreV1Api` - Core Kubernetes resources (pods, services, namespaces, etc.)
   - `AppsV1Api` - Application resources (deployments, daemonsets, etc.)

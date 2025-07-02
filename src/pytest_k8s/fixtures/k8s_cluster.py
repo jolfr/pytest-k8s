@@ -14,6 +14,7 @@ from ..kind.cluster import KindCluster
 from ..kind.cluster_manager import KindClusterManager
 from ..kind.config import KindClusterConfig
 from ..config import get_plugin_config
+from ..cleanup import get_cleanup_manager, ClusterContext
 
 logger = logging.getLogger(__name__)
 
@@ -299,16 +300,40 @@ def k8s_cluster(request):
     # Extract scope override if provided
     effective_scope = params.pop("scope", default_scope)
 
-    # Create the cluster
-    cluster = _fixture_manager.create_cluster(scope=effective_scope, **params)
+    # Get the cleanup manager
+    cleanup_manager = get_cleanup_manager()
+    cluster = None
 
-    # Register cleanup
-    def cleanup():
-        _fixture_manager.cleanup_cluster(cluster)
+    try:
+        # Create the cluster
+        cluster = _fixture_manager.create_cluster(scope=effective_scope, **params)
+        
+        # Register with the robust cleanup manager
+        cleanup_manager.register_cluster(cluster)
 
-    request.addfinalizer(cleanup)
+        # Register multiple cleanup mechanisms for maximum safety
+        def fixture_cleanup():
+            try:
+                _fixture_manager.cleanup_cluster(cluster)
+            except Exception as e:
+                logger.error(f"Fixture cleanup failed: {e}")
+            finally:
+                # Ensure cleanup manager also removes it
+                cleanup_manager.unregister_cluster(cluster)
 
-    return cluster
+        request.addfinalizer(fixture_cleanup)
+
+        # Return the cluster (context manager will be handled by cleanup mechanisms)
+        return cluster
+
+    except Exception as e:
+        # Ensure cleanup even if creation fails
+        if cluster:
+            try:
+                cleanup_manager.cleanup_cluster(cluster, force=True)
+            except Exception as cleanup_error:
+                logger.error(f"Emergency cleanup failed: {cleanup_error}")
+        raise
 
 
 @pytest.fixture(scope="session", autouse=True)
