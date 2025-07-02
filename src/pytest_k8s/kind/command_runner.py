@@ -7,7 +7,7 @@ logging, and timeout management.
 
 import logging
 import subprocess
-from typing import Dict, List, Optional, Union
+from typing import Dict, List, Optional
 
 from .errors import KindClusterError, KindClusterTimeoutError
 from .loggers import KindLoggerFactory
@@ -97,7 +97,7 @@ class CommandRunner:
             logger.error(f"Stdout: {e.stdout}")
             logger.error(f"Stderr: {e.stderr}")
             raise
-        except subprocess.TimeoutExpired as e:
+        except subprocess.TimeoutExpired:
             logger.error(f"Command timed out after {timeout}s: {' '.join(cmd)}")
             raise KindClusterTimeoutError(
                 f"Command timed out after {timeout} seconds: {' '.join(cmd)}", timeout
@@ -338,7 +338,7 @@ class KindCommandRunner(CommandRunner):
             logger.error(f"Command failed: {' '.join(cmd)}")
             logger.error(f"Exit code: {e.returncode}")
             raise
-        except subprocess.TimeoutExpired as e:
+        except subprocess.TimeoutExpired:
             logger.error(f"Command timed out after {timeout}s: {' '.join(cmd)}")
             raise KindClusterTimeoutError(
                 f"Command timed out after {timeout} seconds: {' '.join(cmd)}", timeout

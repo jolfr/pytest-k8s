@@ -9,10 +9,8 @@ import logging
 import pytest
 from typing import Optional
 
-import kubernetes
 from kubernetes import client, config
 
-from .k8s_cluster import k8s_cluster
 from ..kind.cluster import KindCluster
 
 logger = logging.getLogger(__name__)

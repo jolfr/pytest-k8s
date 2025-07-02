@@ -6,7 +6,6 @@ for kind cluster operations.
 """
 
 from dataclasses import dataclass, field
-from pathlib import Path
 from typing import Dict, List, Optional, Union
 
 from .errors import KindClusterConfigError

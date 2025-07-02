@@ -21,8 +21,6 @@ from .errors import (
     KindClusterError,
     KindClusterCreationError,
     KindClusterDeletionError,
-    KindClusterTimeoutError,
-    KindClusterValidationError,
 )
 
 logger = logging.getLogger(__name__)
@@ -171,7 +169,7 @@ class KindCluster:
             logger.error(f"Stdout: {e.stdout}")
             logger.error(f"Stderr: {e.stderr}")
             raise
-        except subprocess.TimeoutExpired as e:
+        except subprocess.TimeoutExpired:
             logger.error(f"Command timed out: {' '.join(cmd)}")
             raise
 

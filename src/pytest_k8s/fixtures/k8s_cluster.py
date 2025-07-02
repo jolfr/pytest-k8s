@@ -7,12 +7,12 @@ during testing. The fixtures support configurable scopes and automatic cleanup.
 
 import logging
 import pytest
-from typing import Any, Dict, Optional, Union
+from typing import Dict, Optional, Union
 from pathlib import Path
 
 from ..kind.cluster import KindCluster
 from ..kind.cluster_manager import KindClusterManager
-from ..kind.config import KindClusterConfig, create_simple_config
+from ..kind.config import KindClusterConfig
 from ..config import get_plugin_config
 
 logger = logging.getLogger(__name__)

@@ -6,14 +6,11 @@ command-line options, configuration management, and plugin hooks.
 """
 
 import pytest
-from typing import Any
 
 from .config import PluginConfig, set_plugin_config
 
 # Import fixtures to make them available
-from .fixtures.k8s_cluster import k8s_cluster
 
-from .fixtures.k8s_client import k8s_client
 
 
 def pytest_addoption(parser: pytest.Parser) -> None:

@@ -8,8 +8,7 @@ subprocess commands in real-time with proper logging integration.
 import subprocess
 import threading
 import time
-from typing import Optional, TextIO, Callable, List, Any
-from io import StringIO
+from typing import Optional, TextIO, List
 
 from .loggers import KindLogger
 
