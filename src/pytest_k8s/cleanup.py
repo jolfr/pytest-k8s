@@ -18,7 +18,6 @@ from pathlib import Path
 from typing import Dict, Optional, Set
 
 from .kind.cluster import KindCluster
-from .kind.errors import KindClusterError
 
 logger = logging.getLogger(__name__)
 

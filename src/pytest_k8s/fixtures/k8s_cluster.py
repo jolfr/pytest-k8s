@@ -14,7 +14,7 @@ from ..kind.cluster import KindCluster
 from ..kind.cluster_manager import KindClusterManager
 from ..kind.config import KindClusterConfig
 from ..config import get_plugin_config
-from ..cleanup import get_cleanup_manager, ClusterContext
+from ..cleanup import get_cleanup_manager
 
 logger = logging.getLogger(__name__)
 
@@ -326,7 +326,7 @@ def k8s_cluster(request):
         # Return the cluster (context manager will be handled by cleanup mechanisms)
         return cluster
 
-    except Exception as e:
+    except Exception:
         # Ensure cleanup even if creation fails
         if cluster:
             try:

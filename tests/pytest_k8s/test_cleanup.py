@@ -8,11 +8,9 @@ cleanup scenarios to ensure clusters are always properly cleaned up.
 import os
 import signal
 import subprocess
-import tempfile
 import time
 import pytest
-from pathlib import Path
-from unittest.mock import Mock, patch, MagicMock
+from unittest.mock import Mock, patch
 
 from pytest_k8s.cleanup import (
     ClusterCleanupManager,
@@ -178,7 +176,7 @@ class TestClusterCleanupManager:
         """Test that signal handlers are registered."""
         # Since ClusterCleanupManager is a singleton, we need to test differently
         # We'll check that the signal handlers are actually set
-        manager = ClusterCleanupManager.get_instance()
+        ClusterCleanupManager.get_instance()
         
         # Check that signal handlers are registered by verifying they're not the default
         current_sigint_handler = signal.signal(signal.SIGINT, signal.SIG_DFL)
@@ -332,7 +330,7 @@ class TestCleanupIntegration:
             try:
                 if 'cluster' in locals():
                     cluster.delete()
-            except:
+            except Exception:
                 pass
             raise e
 
@@ -347,7 +345,7 @@ class TestCleanupConfiguration:
             mock_tracker_class.return_value = mock_tracker
             
             # Create new cleanup manager instance
-            manager = ClusterCleanupManager()
+            ClusterCleanupManager()
             
             # Verify orphaned cleanup was attempted
             mock_tracker.cleanup_orphaned_clusters.assert_called_once()
