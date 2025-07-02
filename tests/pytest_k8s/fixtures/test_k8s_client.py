@@ -29,7 +29,10 @@ class TestKubernetesClient:
             client = KubernetesClient(mock_cluster)
             
             assert client.cluster is mock_cluster
-            mock_load_config.assert_called_once_with(config_file="/tmp/kubeconfig")
+            mock_load_config.assert_called_once_with(
+                config_file="/tmp/kubeconfig",
+                context="kind-test-cluster"
+            )
     
     def test_init_with_no_kubeconfig_path(self):
         """Test KubernetesClient initialization fails without kubeconfig path."""
