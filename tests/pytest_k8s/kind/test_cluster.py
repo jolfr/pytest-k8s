@@ -7,16 +7,15 @@ including unit tests with mocking and integration tests.
 
 import os
 import subprocess
-import tempfile
 import time
 from pathlib import Path
-from unittest.mock import MagicMock, Mock, call, mock_open, patch
+from unittest.mock import Mock, call, mock_open, patch
 
 import pytest
 import yaml
 
 from pytest_k8s.kind.cluster import KindCluster
-from pytest_k8s.kind.config import KindClusterConfig, create_simple_config
+from pytest_k8s.kind.config import create_simple_config
 from pytest_k8s.kind.errors import (
     KindClusterError,
     KindClusterCreationError,
@@ -608,7 +607,7 @@ class TestKindClusterIntegration:
             try:
                 cluster.delete()
                 assert not cluster.exists()
-            except Exception as e:
+            except Exception:
                 # Best effort cleanup
                 try:
                     subprocess.run(

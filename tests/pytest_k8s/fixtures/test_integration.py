@@ -8,14 +8,8 @@ mock cluster creation behavior to ensure real integration testing.
 """
 
 import pytest
-import tempfile
-import time
-from pathlib import Path
-from unittest.mock import Mock, patch, MagicMock
+from unittest.mock import Mock, patch
 
-from pytest_k8s.fixtures.k8s_cluster import ClusterFixtureManager
-from pytest_k8s.fixtures.k8s_client import KubernetesClient
-from pytest_k8s.kind.cluster import KindCluster
 
 
 class TestClusterClientIntegration:
@@ -288,7 +282,7 @@ class TestParameterizedIntegration:
                 assert calls[1][1]["name"] == "param-cluster-2"
                 assert calls[1][1]["image"] == "kindest/node:v1.27.0"
                 assert calls[2][1]["name"] == "param-cluster-3"
-                assert calls[2][1]["keep_cluster"] == False
+                assert not calls[2][1]["keep_cluster"]
 
     def test_client_with_cluster_config_object(self, pytester):
         """Test k8s_client integration with cluster using config object."""

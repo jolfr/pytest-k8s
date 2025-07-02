@@ -6,7 +6,7 @@ This module tests the unified logger for kind command output streaming.
 
 import logging
 import pytest
-from unittest.mock import Mock, patch
+from unittest.mock import Mock
 
 from pytest_k8s.kind.loggers import (
     KindLogger,

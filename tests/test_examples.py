@@ -312,7 +312,7 @@ def test_multiple_api_clients(k8s_client):
     apps_v1 = k8s_client.AppsV1Api
     networking_v1 = k8s_client.NetworkingV1Api
     rbac_v1 = k8s_client.RbacAuthorizationV1Api
-    custom_objects = k8s_client.CustomObjectsApi
+    custom_objects = k8s_client.CustomObjectsApi  # noqa: F841
 
     # Test Core V1 API (pods, services, namespaces, etc.)
     namespaces = core_v1.list_namespace()
@@ -321,11 +321,11 @@ def test_multiple_api_clients(k8s_client):
     )  # default, kube-system, kube-public, kube-node-lease
 
     # Test Apps V1 API (deployments, daemonsets, etc.)
-    deployments = apps_v1.list_deployment_for_all_namespaces()
+    deployments = apps_v1.list_deployment_for_all_namespaces()  # noqa: F841
     # Should have system deployments
 
     # Test Networking V1 API (network policies, ingresses, etc.)
-    network_policies = networking_v1.list_network_policy_for_all_namespaces()
+    network_policies = networking_v1.list_network_policy_for_all_namespaces()  # noqa: F841
     # May be empty in basic cluster
 
     # Test RBAC V1 API (roles, bindings, etc.)
@@ -385,7 +385,7 @@ def test_deployment_lifecycle(k8s_client):
         )
         assert scaled_deployment.spec.replicas == 3
 
-        print(f"✓ Scaled deployment to 3 replicas")
+        print(f"✓ Scaled deployment to {scaled_deployment.spec.replicas} replicas")
 
         # 3. Verify pods are created
         import time

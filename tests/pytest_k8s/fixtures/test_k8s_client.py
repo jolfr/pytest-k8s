@@ -6,14 +6,10 @@ including tests for different usage patterns and error scenarios.
 """
 
 import pytest
-import tempfile
-import time
-from pathlib import Path
-from unittest.mock import Mock, patch, MagicMock
+from unittest.mock import Mock, patch
 
 from pytest_k8s.fixtures.k8s_client import KubernetesClient, k8s_client
 from pytest_k8s.kind.cluster import KindCluster
-from pytest_k8s.kind.config import KindClusterConfig, create_simple_config
 
 
 class TestKubernetesClient:
@@ -278,7 +274,6 @@ class TestClientFixtureDocumentation:
     def test_client_fixture_import_availability(self):
         """Test that client fixtures can be imported directly."""
         # Test that the client fixture can be imported
-        from pytest_k8s.fixtures.k8s_client import k8s_client
 
         # Verify it's a callable fixture
         assert callable(k8s_client)

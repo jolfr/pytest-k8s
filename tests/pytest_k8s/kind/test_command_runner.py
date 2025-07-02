@@ -7,7 +7,6 @@ and KubectlCommandRunner classes, including unit tests with mocking and error ha
 
 import os
 import subprocess
-import time
 from unittest.mock import Mock, patch
 
 import pytest

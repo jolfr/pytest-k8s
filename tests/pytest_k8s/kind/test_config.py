@@ -275,7 +275,7 @@ class TestKindClusterConfig:
 
         # This should fail during config validation, but let's test the port mapping logic
         with pytest.raises(KindClusterConfigError):
-            config = KindClusterConfig(nodes=nodes)
+            KindClusterConfig(nodes=nodes)
 
     def test_to_yaml_dict_minimal(self):
         """Test to_yaml_dict with minimal configuration."""
