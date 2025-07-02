@@ -155,6 +155,7 @@ class TestClusterFixtureManager:
 class TestFixtureScopes:
     """Test fixture scopes using pytester with real clusters."""
 
+    @pytest.mark.integration
     @pytest.mark.slow
     def test_session_scope_cluster_reuse(self, pytester):
         """Test that session-scoped cluster is reused across tests."""
@@ -192,6 +193,7 @@ class TestFixtureScopes:
         )
         assert result.ret == 0
 
+    @pytest.mark.integration
     @pytest.mark.slow
     def test_function_scope_cluster_per_test(self, pytester):
         """Test that function-scoped cluster creates new cluster per test."""

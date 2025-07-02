@@ -16,6 +16,7 @@ from pathlib import Path
 # =============================================================================
 
 
+@pytest.mark.integration
 def test_basic_cluster_usage(k8s_cluster):
     """
     Basic cluster fixture usage with default configuration.
@@ -34,6 +35,7 @@ def test_basic_cluster_usage(k8s_cluster):
     print(f"✓ Cluster '{k8s_cluster.name}' is ready")
 
 
+@pytest.mark.integration
 def test_basic_client_usage(k8s_client):
     """
     Basic client fixture usage with automatic cluster connection.
@@ -59,6 +61,7 @@ def test_basic_client_usage(k8s_client):
     print(f"✓ Connected to cluster with {len(nodes.items)} nodes")
 
 
+@pytest.mark.integration
 def test_cluster_and_client_together(k8s_cluster, k8s_client):
     """
     Using both cluster and client fixtures together.
@@ -81,6 +84,7 @@ def test_cluster_and_client_together(k8s_cluster, k8s_client):
 # =============================================================================
 
 
+@pytest.mark.integration
 @pytest.mark.parametrize(
     "k8s_cluster",
     [{"name": "session-scoped-cluster", "scope": "session"}],
@@ -103,6 +107,7 @@ def test_session_scoped_cluster(k8s_cluster):
     print(f"✓ Using session-scoped cluster: {k8s_cluster.name}")
 
 
+@pytest.mark.integration
 @pytest.mark.parametrize(
     "k8s_cluster",
     [{"name": "function-scoped-cluster", "scope": "function"}],
@@ -125,6 +130,7 @@ def test_function_scoped_cluster(k8s_cluster):
     print(f"✓ Using function-scoped cluster: {k8s_cluster.name}")
 
 
+@pytest.mark.integration
 @pytest.mark.parametrize(
     "k8s_cluster", [{"name": "module-scoped-cluster", "scope": "module"}], indirect=True
 )
@@ -145,6 +151,7 @@ def test_module_scoped_cluster(k8s_cluster):
     print(f"✓ Using module-scoped cluster: {k8s_cluster.name}")
 
 
+@pytest.mark.integration
 @pytest.mark.parametrize(
     "k8s_cluster", [{"name": "class-scoped-cluster", "scope": "class"}], indirect=True
 )
@@ -170,6 +177,7 @@ def test_class_scoped_cluster(k8s_cluster):
 # =============================================================================
 
 
+@pytest.mark.integration
 @pytest.mark.parametrize(
     "k8s_cluster",
     [{"name": "client-session-cluster", "scope": "session"}],
@@ -198,6 +206,7 @@ def test_client_with_session_scope(k8s_cluster, k8s_client):
     print(f"✓ Client connected to session cluster: {k8s_client.cluster.name}")
 
 
+@pytest.mark.integration
 @pytest.mark.parametrize(
     "k8s_cluster",
     [{"name": "client-function-cluster", "scope": "function"}],
@@ -236,6 +245,7 @@ def test_client_with_function_scope(k8s_cluster, k8s_client):
 # =============================================================================
 
 
+@pytest.mark.integration
 @pytest.mark.parametrize(
     "k8s_cluster",
     [
@@ -263,6 +273,7 @@ def test_cluster_with_custom_timeout(k8s_cluster):
     print(f"✓ Custom timeout cluster ready: {k8s_cluster.name}")
 
 
+@pytest.mark.integration
 @pytest.mark.parametrize(
     "k8s_cluster",
     [
@@ -300,6 +311,7 @@ def test_cluster_with_custom_image(k8s_cluster, k8s_client):
 # =============================================================================
 
 
+@pytest.mark.integration
 def test_multiple_api_clients(k8s_client):
     """
     Example of using multiple Kubernetes API clients.
@@ -335,6 +347,7 @@ def test_multiple_api_clients(k8s_client):
     print("✓ Successfully accessed all API client types")
 
 
+@pytest.mark.integration
 def test_deployment_lifecycle(k8s_client):
     """
     Example of complete deployment lifecycle testing.
@@ -413,6 +426,7 @@ def test_deployment_lifecycle(k8s_client):
 # =============================================================================
 
 
+@pytest.mark.integration
 def test_configmap_and_secret_management(k8s_client):
     """
     Example of ConfigMap and Secret management.
@@ -488,6 +502,7 @@ def test_configmap_and_secret_management(k8s_client):
 # =============================================================================
 
 
+@pytest.mark.integration
 def test_service_creation_and_discovery(k8s_client):
     """
     Example of Service creation and service discovery.
@@ -586,6 +601,7 @@ def test_service_creation_and_discovery(k8s_client):
 # =============================================================================
 
 
+@pytest.mark.integration
 def test_cluster_error_handling(k8s_client):
     """
     Example of error handling with cluster and client fixtures.
@@ -619,6 +635,7 @@ def test_cluster_error_handling(k8s_client):
 # =============================================================================
 
 
+@pytest.mark.integration
 @pytest.mark.parametrize(
     "k8s_cluster",
     [{"name": "performance-test-cluster", "scope": "function", "timeout": 900}],
@@ -676,6 +693,7 @@ def test_bulk_resource_operations(k8s_cluster, k8s_client):
 # =============================================================================
 
 
+@pytest.mark.integration
 @pytest.mark.parametrize(
     "k8s_cluster",
     [{"name": "integration-test-cluster", "scope": "function"}],

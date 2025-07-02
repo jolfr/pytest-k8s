@@ -574,6 +574,7 @@ class TestKindClusterIntegration:
         """Generate a unique cluster name for integration tests."""
         return f"pytest-integration-{int(time.time())}"
 
+    @pytest.mark.integration
     def test_cluster_lifecycle_integration(
         self, skip_if_no_kind, integration_cluster_name
     ):
@@ -623,6 +624,7 @@ class TestKindClusterIntegration:
                 except Exception:
                     pass
 
+    @pytest.mark.integration
     def test_context_manager_integration(
         self, skip_if_no_kind, integration_cluster_name
     ):
@@ -636,6 +638,7 @@ class TestKindClusterIntegration:
         # Cluster should be deleted after context exit
         assert not cluster.exists()
 
+    @pytest.mark.integration
     def test_cluster_with_custom_config_integration(
         self, skip_if_no_kind, integration_cluster_name
     ):

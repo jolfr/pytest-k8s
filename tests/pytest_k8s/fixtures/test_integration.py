@@ -406,6 +406,7 @@ class TestErrorHandlingIntegration:
 class TestRealIntegrationScenarios:
     """Test real-world integration scenarios without mocking cluster creation."""
 
+    @pytest.mark.integration
     @pytest.mark.slow
     def test_real_cluster_client_integration(self, pytester):
         """Test real integration between cluster and client fixtures."""
@@ -458,6 +459,7 @@ class TestRealIntegrationScenarios:
         )
         assert result.ret == 0
 
+    @pytest.mark.integration
     @pytest.mark.slow
     def test_multiple_api_clients_integration(self, pytester):
         """Test integration with multiple API clients."""
@@ -507,6 +509,7 @@ class TestRealIntegrationScenarios:
         )
         assert result.ret == 0
 
+    @pytest.mark.integration
     @pytest.mark.slow
     def test_function_scope_real_isolation(self, pytester):
         """Test that function-scoped fixtures provide real isolation."""
