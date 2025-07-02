@@ -21,16 +21,16 @@ logger = logging.getLogger(__name__)
 class ClusterFixtureManager:
     """
     Manages cluster fixtures with different scopes and configurations.
-    
+
     This class handles the creation, configuration, and cleanup of clusters
     for pytest fixtures with different scopes.
     """
-    
+
     def __init__(self):
         """Initialize the cluster fixture manager."""
         self._cluster_manager = KindClusterManager()
         self._active_clusters: Dict[str, KindCluster] = {}
-    
+
     def create_cluster(
         self,
         scope: str = "session",
@@ -41,11 +41,11 @@ class ClusterFixtureManager:
         keep_cluster: Optional[bool] = None,
         image: Optional[str] = None,
         extra_port_mappings: Optional[list] = None,
-        **kwargs
+        **kwargs,
     ) -> KindCluster:
         """
         Create a cluster with the specified configuration.
-        
+
         Args:
             scope: Fixture scope (function, class, module, package, session)
             name: Cluster name. Generated if None.
@@ -56,33 +56,33 @@ class ClusterFixtureManager:
             image: Kubernetes node image to use.
             extra_port_mappings: Additional port mappings for the cluster.
             **kwargs: Additional cluster configuration options.
-            
+
         Returns:
             KindCluster instance.
         """
         # Get plugin configuration for defaults
         plugin_config = get_plugin_config()
-        
+
         # Set defaults from plugin config if not specified
         if timeout is None:
             timeout = 300  # Default timeout
         if keep_cluster is None:
             keep_cluster = False
-        
+
         # Create cluster configuration
         cluster_config = {}
         if timeout is not None:
-            cluster_config['timeout'] = timeout
+            cluster_config["timeout"] = timeout
         if keep_cluster is not None:
-            cluster_config['keep_cluster'] = keep_cluster
+            cluster_config["keep_cluster"] = keep_cluster
         if image is not None:
-            cluster_config['image'] = image
+            cluster_config["image"] = image
         if extra_port_mappings is not None:
-            cluster_config['extra_port_mappings'] = extra_port_mappings
-        
+            cluster_config["extra_port_mappings"] = extra_port_mappings
+
         # Merge with additional kwargs
         cluster_config.update(kwargs)
-        
+
         # Create the cluster
         if config:
             cluster = KindCluster(name=name, config=config, **cluster_config)
@@ -90,19 +90,19 @@ class ClusterFixtureManager:
             cluster = KindCluster(name=name, config_path=config_path, **cluster_config)
         else:
             cluster = KindCluster(name=name, **cluster_config)
-        
+
         # Track the cluster
         self._active_clusters[cluster.name] = cluster
-        
+
         logger.info(f"Creating {scope}-scoped cluster: {cluster.name}")
         cluster.create()
-        
+
         return cluster
-    
+
     def cleanup_cluster(self, cluster: KindCluster) -> None:
         """
         Clean up a cluster.
-        
+
         Args:
             cluster: Cluster to clean up.
         """
@@ -114,7 +114,7 @@ class ClusterFixtureManager:
                 logger.error(f"Error cleaning up cluster {cluster.name}: {e}")
             finally:
                 del self._active_clusters[cluster.name]
-    
+
     def cleanup_all(self) -> None:
         """Clean up all active clusters."""
         for cluster in list(self._active_clusters.values()):
@@ -128,27 +128,28 @@ _fixture_manager = ClusterFixtureManager()
 def _create_scoped_cluster_fixture(scope: str):
     """
     Create a cluster fixture with the specified scope.
-    
+
     Args:
         scope: Fixture scope (function, class, module, package, session)
-        
+
     Returns:
         Pytest fixture function.
     """
+
     @pytest.fixture(scope=scope)
     def cluster_fixture(request):
         """
         Create and manage a Kubernetes cluster for testing.
-        
+
         This fixture creates a kind-based Kubernetes cluster that can be used
         for testing applications with Kubernetes dependencies.
-        
+
         Args:
             request: Pytest request object containing fixture parameters.
-            
+
         Returns:
             KindCluster instance ready for testing.
-            
+
         Fixture Parameters:
             name (str, optional): Cluster name. Generated if not provided.
             config (KindClusterConfig, optional): Cluster configuration object.
@@ -158,7 +159,7 @@ def _create_scoped_cluster_fixture(scope: str):
             image (str, optional): Kubernetes node image to use.
             extra_port_mappings (list, optional): Additional port mappings.
             scope (str, optional): Override the fixture scope for this specific cluster.
-            
+
         Example:
             @pytest.mark.parametrize("k8s_cluster", [
                 {"name": "test-cluster", "timeout": 600, "scope": "function"}
@@ -167,48 +168,49 @@ def _create_scoped_cluster_fixture(scope: str):
                 assert k8s_cluster.is_ready()
         """
         # Get fixture parameters
-        params = getattr(request, 'param', {})
+        params = getattr(request, "param", {})
         if not isinstance(params, dict):
             params = {}
-        
+
         # Extract scope override if provided
-        effective_scope = params.pop('scope', scope)
-        
+        effective_scope = params.pop("scope", scope)
+
         # Create the cluster
         cluster = _fixture_manager.create_cluster(scope=effective_scope, **params)
-        
+
         # Register cleanup
         def cleanup():
             _fixture_manager.cleanup_cluster(cluster)
-        
+
         request.addfinalizer(cleanup)
-        
+
         return cluster
-    
+
     return cluster_fixture
 
 
 def _create_dynamic_cluster_fixture():
     """
     Create a cluster fixture that uses the configured default scope.
-    
+
     Returns:
         Pytest fixture function.
     """
+
     def cluster_fixture(request):
         """
         Create and manage a Kubernetes cluster for testing.
-        
+
         This fixture creates a kind-based Kubernetes cluster that can be used
         for testing applications with Kubernetes dependencies. The scope is
         determined by the plugin configuration or can be overridden via parameters.
-        
+
         Args:
             request: Pytest request object containing fixture parameters.
-            
+
         Returns:
             KindCluster instance ready for testing.
-            
+
         Fixture Parameters:
             name (str, optional): Cluster name. Generated if not provided.
             config (KindClusterConfig, optional): Cluster configuration object.
@@ -218,7 +220,7 @@ def _create_dynamic_cluster_fixture():
             image (str, optional): Kubernetes node image to use.
             extra_port_mappings (list, optional): Additional port mappings.
             scope (str, optional): Override the default scope for this specific cluster.
-            
+
         Example:
             @pytest.mark.parametrize("k8s_cluster", [
                 {"name": "test-cluster", "timeout": 600, "scope": "function"}
@@ -227,28 +229,28 @@ def _create_dynamic_cluster_fixture():
                 assert k8s_cluster.is_ready()
         """
         # Get fixture parameters
-        params = getattr(request, 'param', {})
+        params = getattr(request, "param", {})
         if not isinstance(params, dict):
             params = {}
-        
+
         # Get the default scope from configuration
         plugin_config = get_plugin_config()
         default_scope = plugin_config.cluster.default_scope
-        
+
         # Extract scope override if provided
-        effective_scope = params.pop('scope', default_scope)
-        
+        effective_scope = params.pop("scope", default_scope)
+
         # Create the cluster
         cluster = _fixture_manager.create_cluster(scope=effective_scope, **params)
-        
+
         # Register cleanup
         def cleanup():
             _fixture_manager.cleanup_cluster(cluster)
-        
+
         request.addfinalizer(cleanup)
-        
+
         return cluster
-    
+
     return cluster_fixture
 
 
@@ -257,17 +259,17 @@ def _create_dynamic_cluster_fixture():
 def k8s_cluster(request):
     """
     Create and manage a Kubernetes cluster for testing.
-    
+
     This fixture creates a kind-based Kubernetes cluster that can be used
     for testing applications with Kubernetes dependencies. The scope is
     determined by the plugin configuration or can be overridden via parameters.
-    
+
     Args:
         request: Pytest request object containing fixture parameters.
-        
+
     Returns:
         KindCluster instance ready for testing.
-        
+
     Fixture Parameters:
         name (str, optional): Cluster name. Generated if not provided.
         config (KindClusterConfig, optional): Cluster configuration object.
@@ -277,7 +279,7 @@ def k8s_cluster(request):
         image (str, optional): Kubernetes node image to use.
         extra_port_mappings (list, optional): Additional port mappings.
         scope (str, optional): Override the default scope for this specific cluster.
-        
+
     Example:
         @pytest.mark.parametrize("k8s_cluster", [
             {"name": "test-cluster", "timeout": 600, "scope": "function"}
@@ -286,26 +288,26 @@ def k8s_cluster(request):
             assert k8s_cluster.is_ready()
     """
     # Get fixture parameters
-    params = getattr(request, 'param', {})
+    params = getattr(request, "param", {})
     if not isinstance(params, dict):
         params = {}
-    
+
     # Get the default scope from configuration
     plugin_config = get_plugin_config()
     default_scope = plugin_config.cluster.default_scope
-    
+
     # Extract scope override if provided
-    effective_scope = params.pop('scope', default_scope)
-    
+    effective_scope = params.pop("scope", default_scope)
+
     # Create the cluster
     cluster = _fixture_manager.create_cluster(scope=effective_scope, **params)
-    
+
     # Register cleanup
     def cleanup():
         _fixture_manager.cleanup_cluster(cluster)
-    
+
     request.addfinalizer(cleanup)
-    
+
     return cluster
 
 
@@ -313,11 +315,11 @@ def k8s_cluster(request):
 def _cleanup_all_clusters():
     """
     Auto-use fixture to ensure all clusters are cleaned up at session end.
-    
+
     This fixture automatically runs at the end of the test session to ensure
     that any remaining clusters are properly cleaned up.
     """
     yield
-    
+
     # Cleanup any remaining clusters
     _fixture_manager.cleanup_all()

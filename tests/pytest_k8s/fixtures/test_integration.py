@@ -20,7 +20,7 @@ from pytest_k8s.kind.cluster import KindCluster
 
 class TestClusterClientIntegration:
     """Test integration between k8s_cluster and k8s_client fixtures."""
-    
+
     def test_client_uses_same_cluster_instance(self, pytester):
         """Test that k8s_client uses the same cluster instance as k8s_cluster."""
         pytester.makepyfile("""
@@ -32,18 +32,18 @@ class TestClusterClientIntegration:
                 assert k8s_client.cluster.name == k8s_cluster.name
                 assert k8s_client.cluster.kubeconfig_path == k8s_cluster.kubeconfig_path
         """)
-        
+
         # Mock both fixtures to avoid actual cluster creation
-        with patch('pytest_k8s.fixtures.k8s_cluster.KindCluster') as mock_cluster_class:
-            with patch('kubernetes.config.load_kube_config'):
+        with patch("pytest_k8s.fixtures.k8s_cluster.KindCluster") as mock_cluster_class:
+            with patch("kubernetes.config.load_kube_config"):
                 mock_cluster = Mock()
                 mock_cluster.name = "integration-test-cluster"
                 mock_cluster.kubeconfig_path = "/tmp/test-kubeconfig"
                 mock_cluster_class.return_value = mock_cluster
-                
+
                 result = pytester.runpytest("-v")
                 assert result.ret == 0
-    
+
     def test_client_connects_to_cluster_kubeconfig(self, pytester):
         """Test that k8s_client properly connects using cluster's kubeconfig."""
         pytester.makepyfile("""
@@ -54,24 +54,24 @@ class TestClusterClientIntegration:
                 assert k8s_client.cluster.kubeconfig_path is not None
                 assert k8s_client.cluster.kubeconfig_path == k8s_cluster.kubeconfig_path
         """)
-        
+
         # Mock cluster and kubeconfig loading
-        with patch('pytest_k8s.fixtures.k8s_cluster.KindCluster') as mock_cluster_class:
-            with patch('kubernetes.config.load_kube_config') as mock_load_config:
+        with patch("pytest_k8s.fixtures.k8s_cluster.KindCluster") as mock_cluster_class:
+            with patch("kubernetes.config.load_kube_config") as mock_load_config:
                 mock_cluster = Mock()
                 mock_cluster.name = "kubeconfig-test-cluster"
                 mock_cluster.kubeconfig_path = "/tmp/test-kubeconfig"
                 mock_cluster_class.return_value = mock_cluster
-                
+
                 result = pytester.runpytest("-v")
                 assert result.ret == 0
-                
+
                 # Verify kubeconfig was loaded with correct parameters
                 mock_load_config.assert_called_with(
                     config_file="/tmp/test-kubeconfig",
-                    context="kind-kubeconfig-test-cluster"
+                    context="kind-kubeconfig-test-cluster",
                 )
-    
+
     def test_client_cleanup_after_cluster_cleanup(self, pytester):
         """Test that k8s_client is properly cleaned up when cluster is cleaned up."""
         pytester.makepyfile("""
@@ -87,18 +87,18 @@ class TestClusterClientIntegration:
                 assert k8s_client is not None
                 assert k8s_client.cluster is k8s_cluster
         """)
-        
+
         # Mock cluster and client to track cleanup calls
-        with patch('pytest_k8s.fixtures.k8s_cluster.KindCluster') as mock_cluster_class:
-            with patch('kubernetes.config.load_kube_config'):
+        with patch("pytest_k8s.fixtures.k8s_cluster.KindCluster") as mock_cluster_class:
+            with patch("kubernetes.config.load_kube_config"):
                 mock_cluster = Mock()
                 mock_cluster.name = "cleanup-test-cluster"
                 mock_cluster.kubeconfig_path = "/tmp/test-kubeconfig"
                 mock_cluster_class.return_value = mock_cluster
-                
+
                 result = pytester.runpytest("-v")
                 assert result.ret == 0
-                
+
                 # Verify cluster cleanup was called
                 mock_cluster.create.assert_called_once()
                 mock_cluster.delete.assert_called_once()
@@ -107,7 +107,7 @@ class TestClusterClientIntegration:
 
 class TestScopeIntegration:
     """Test scope integration between cluster and client fixtures."""
-    
+
     def test_session_scope_integration(self, pytester):
         """Test that both fixtures work correctly with session scope."""
         pytester.makepyfile("""
@@ -132,20 +132,20 @@ class TestScopeIntegration:
                 # But may have different client instances (depending on implementation)
                 # The important thing is that clients use the same cluster
         """)
-        
-        with patch('pytest_k8s.fixtures.k8s_cluster.KindCluster') as mock_cluster_class:
-            with patch('kubernetes.config.load_kube_config'):
+
+        with patch("pytest_k8s.fixtures.k8s_cluster.KindCluster") as mock_cluster_class:
+            with patch("kubernetes.config.load_kube_config"):
                 mock_cluster = Mock()
                 mock_cluster.name = "session-scope-cluster"
                 mock_cluster.kubeconfig_path = "/tmp/session-kubeconfig"
                 mock_cluster_class.return_value = mock_cluster
-                
+
                 result = pytester.runpytest("-v")
                 assert result.ret == 0
-                
+
                 # Should only create one cluster for session scope
                 assert mock_cluster_class.call_count == 1
-    
+
     def test_function_scope_integration(self, pytester):
         """Test that both fixtures work correctly with function scope."""
         pytester.makepyfile("""
@@ -178,25 +178,25 @@ class TestScopeIntegration:
                 assert "func-cluster-1" in cluster_instances
                 assert "func-cluster-2" in cluster_instances
         """)
-        
-        with patch('pytest_k8s.fixtures.k8s_cluster.KindCluster') as mock_cluster_class:
-            with patch('kubernetes.config.load_kube_config'):
+
+        with patch("pytest_k8s.fixtures.k8s_cluster.KindCluster") as mock_cluster_class:
+            with patch("kubernetes.config.load_kube_config"):
                 mock_cluster_1 = Mock()
                 mock_cluster_1.name = "func-cluster-1"
                 mock_cluster_1.kubeconfig_path = "/tmp/func-kubeconfig-1"
-                
+
                 mock_cluster_2 = Mock()
                 mock_cluster_2.name = "func-cluster-2"
                 mock_cluster_2.kubeconfig_path = "/tmp/func-kubeconfig-2"
-                
+
                 mock_cluster_class.side_effect = [mock_cluster_1, mock_cluster_2]
-                
+
                 result = pytester.runpytest("-v")
                 assert result.ret == 0
-                
+
                 # Should create two clusters for function scope
                 assert mock_cluster_class.call_count == 2
-    
+
     def test_mixed_scope_integration(self, pytester):
         """Test integration when cluster and client have different scope parameters."""
         pytester.makepyfile("""
@@ -211,21 +211,21 @@ class TestScopeIntegration:
                 assert k8s_client.cluster is k8s_cluster
                 assert k8s_cluster.name == "mixed-scope-cluster"
         """)
-        
-        with patch('pytest_k8s.fixtures.k8s_cluster.KindCluster') as mock_cluster_class:
-            with patch('kubernetes.config.load_kube_config'):
+
+        with patch("pytest_k8s.fixtures.k8s_cluster.KindCluster") as mock_cluster_class:
+            with patch("kubernetes.config.load_kube_config"):
                 mock_cluster = Mock()
                 mock_cluster.name = "mixed-scope-cluster"
                 mock_cluster.kubeconfig_path = "/tmp/mixed-kubeconfig"
                 mock_cluster_class.return_value = mock_cluster
-                
+
                 result = pytester.runpytest("-v")
                 assert result.ret == 0
 
 
 class TestParameterizedIntegration:
     """Test integration with parameterized fixtures."""
-    
+
     def test_parameterized_cluster_with_client(self, pytester):
         """Test that k8s_client works with parameterized k8s_cluster."""
         pytester.makepyfile("""
@@ -260,34 +260,36 @@ class TestParameterizedIntegration:
                 assert "param-cluster-2" in cluster_names
                 assert "param-cluster-3" in cluster_names
         """)
-        
-        with patch('pytest_k8s.fixtures.k8s_cluster.KindCluster') as mock_cluster_class:
-            with patch('kubernetes.config.load_kube_config'):
+
+        with patch("pytest_k8s.fixtures.k8s_cluster.KindCluster") as mock_cluster_class:
+            with patch("kubernetes.config.load_kube_config"):
                 # Create mock clusters for each parameter set
                 mock_clusters = []
-                for i, name in enumerate(["param-cluster-1", "param-cluster-2", "param-cluster-3"]):
+                for i, name in enumerate(
+                    ["param-cluster-1", "param-cluster-2", "param-cluster-3"]
+                ):
                     mock_cluster = Mock()
                     mock_cluster.name = name
-                    mock_cluster.kubeconfig_path = f"/tmp/param-kubeconfig-{i+1}"
+                    mock_cluster.kubeconfig_path = f"/tmp/param-kubeconfig-{i + 1}"
                     mock_clusters.append(mock_cluster)
-                
+
                 mock_cluster_class.side_effect = mock_clusters
-                
+
                 result = pytester.runpytest("-v")
                 assert result.ret == 0
-                
+
                 # Should create three clusters for the three parameter sets
                 assert mock_cluster_class.call_count == 3
-                
+
                 # Verify each cluster was created with correct parameters
                 calls = mock_cluster_class.call_args_list
-                assert calls[0][1]['name'] == "param-cluster-1"
-                assert calls[0][1]['timeout'] == 300
-                assert calls[1][1]['name'] == "param-cluster-2"
-                assert calls[1][1]['image'] == "kindest/node:v1.27.0"
-                assert calls[2][1]['name'] == "param-cluster-3"
-                assert calls[2][1]['keep_cluster'] == False
-    
+                assert calls[0][1]["name"] == "param-cluster-1"
+                assert calls[0][1]["timeout"] == 300
+                assert calls[1][1]["name"] == "param-cluster-2"
+                assert calls[1][1]["image"] == "kindest/node:v1.27.0"
+                assert calls[2][1]["name"] == "param-cluster-3"
+                assert calls[2][1]["keep_cluster"] == False
+
     def test_client_with_cluster_config_object(self, pytester):
         """Test k8s_client integration with cluster using config object."""
         pytester.makepyfile("""
@@ -302,25 +304,25 @@ class TestParameterizedIntegration:
                 assert k8s_client.cluster is k8s_cluster
                 assert k8s_cluster.name == "config-cluster"
         """)
-        
-        with patch('pytest_k8s.fixtures.k8s_cluster.KindCluster') as mock_cluster_class:
-            with patch('kubernetes.config.load_kube_config'):
+
+        with patch("pytest_k8s.fixtures.k8s_cluster.KindCluster") as mock_cluster_class:
+            with patch("kubernetes.config.load_kube_config"):
                 mock_cluster = Mock()
                 mock_cluster.name = "config-cluster"
                 mock_cluster.kubeconfig_path = "/tmp/config-kubeconfig"
                 mock_cluster_class.return_value = mock_cluster
-                
+
                 result = pytester.runpytest("-v")
                 assert result.ret == 0
-                
+
                 # Verify cluster was created with config object
                 call_args = mock_cluster_class.call_args
-                assert 'config' in call_args[1]
+                assert "config" in call_args[1]
 
 
 class TestErrorHandlingIntegration:
     """Test error handling in integrated cluster and client fixtures."""
-    
+
     def test_client_handles_cluster_creation_failure(self, pytester):
         """Test that client fixture handles cluster creation failures gracefully."""
         pytester.makepyfile("""
@@ -331,19 +333,21 @@ class TestErrorHandlingIntegration:
                 # but the failure should be handled properly
                 assert False, "Should not reach this point"
         """)
-        
+
         # Mock cluster to fail on creation
-        with patch('pytest_k8s.fixtures.k8s_cluster.KindCluster') as mock_cluster_class:
+        with patch("pytest_k8s.fixtures.k8s_cluster.KindCluster") as mock_cluster_class:
             from pytest_k8s.kind.errors import KindClusterCreationError
-            
+
             mock_cluster = Mock()
-            mock_cluster.create.side_effect = KindClusterCreationError("Creation failed")
+            mock_cluster.create.side_effect = KindClusterCreationError(
+                "Creation failed"
+            )
             mock_cluster_class.return_value = mock_cluster
-            
+
             result = pytester.runpytest("-v")
             # Test should fail due to cluster creation error
             assert result.ret != 0
-    
+
     def test_client_handles_kubeconfig_loading_failure(self, pytester):
         """Test that client handles kubeconfig loading failures."""
         pytester.makepyfile("""
@@ -353,21 +357,21 @@ class TestErrorHandlingIntegration:
                 # This should fail during client creation
                 assert False, "Should not reach this point"
         """)
-        
+
         # Mock cluster creation success but kubeconfig loading failure
-        with patch('pytest_k8s.fixtures.k8s_cluster.KindCluster') as mock_cluster_class:
-            with patch('kubernetes.config.load_kube_config') as mock_load_config:
+        with patch("pytest_k8s.fixtures.k8s_cluster.KindCluster") as mock_cluster_class:
+            with patch("kubernetes.config.load_kube_config") as mock_load_config:
                 mock_cluster = Mock()
                 mock_cluster.name = "kubeconfig-fail-cluster"
                 mock_cluster.kubeconfig_path = "/tmp/invalid-kubeconfig"
                 mock_cluster_class.return_value = mock_cluster
-                
+
                 mock_load_config.side_effect = Exception("Invalid kubeconfig")
-                
+
                 result = pytester.runpytest("-v")
                 # Test should fail due to kubeconfig loading error
                 assert result.ret != 0
-    
+
     def test_cleanup_resilience_with_errors(self, pytester):
         """Test that cleanup is resilient to errors in either fixture."""
         pytester.makepyfile("""
@@ -381,21 +385,25 @@ class TestErrorHandlingIntegration:
                 assert k8s_cluster is not None
                 assert k8s_client is not None
         """)
-        
+
         # Mock both cluster and client to have cleanup errors
-        with patch('pytest_k8s.fixtures.k8s_cluster.KindCluster') as mock_cluster_class:
-            with patch('kubernetes.config.load_kube_config'):
-                with patch('kubernetes.client.ApiClient') as mock_api_client:
+        with patch("pytest_k8s.fixtures.k8s_cluster.KindCluster") as mock_cluster_class:
+            with patch("kubernetes.config.load_kube_config"):
+                with patch("kubernetes.client.ApiClient") as mock_api_client:
                     mock_cluster = Mock()
                     mock_cluster.name = "cleanup-error-cluster"
                     mock_cluster.kubeconfig_path = "/tmp/cleanup-kubeconfig"
-                    mock_cluster.delete.side_effect = Exception("Cluster cleanup failed")
+                    mock_cluster.delete.side_effect = Exception(
+                        "Cluster cleanup failed"
+                    )
                     mock_cluster_class.return_value = mock_cluster
-                    
+
                     mock_api_instance = Mock()
-                    mock_api_instance.close.side_effect = Exception("Client cleanup failed")
+                    mock_api_instance.close.side_effect = Exception(
+                        "Client cleanup failed"
+                    )
                     mock_api_client.return_value = mock_api_instance
-                    
+
                     result = pytester.runpytest("-v")
                     # Test should still pass despite cleanup errors
                     assert result.ret == 0
@@ -403,7 +411,7 @@ class TestErrorHandlingIntegration:
 
 class TestRealIntegrationScenarios:
     """Test real-world integration scenarios without mocking cluster creation."""
-    
+
     @pytest.mark.slow
     def test_real_cluster_client_integration(self, pytester):
         """Test real integration between cluster and client fixtures."""
@@ -415,7 +423,7 @@ class TestRealIntegrationScenarios:
                 # Configure pytest-k8s for faster testing
                 config.option.k8s_cluster_timeout = 120
         """)
-        
+
         pytester.makepyfile("""
             import pytest_k8s
             from kubernetes import client
@@ -450,10 +458,12 @@ class TestRealIntegrationScenarios:
                     namespace="default"
                 )
         """)
-        
-        result = pytester.runpytest("-v", "--tb=short", "--capture=no", "--log-cli-level=INFO")
+
+        result = pytester.runpytest(
+            "-v", "--tb=short", "--capture=no", "--log-cli-level=INFO"
+        )
         assert result.ret == 0
-    
+
     @pytest.mark.slow
     def test_multiple_api_clients_integration(self, pytester):
         """Test integration with multiple API clients."""
@@ -463,7 +473,7 @@ class TestRealIntegrationScenarios:
             def pytest_configure(config):
                 config.option.k8s_cluster_timeout = 120
         """)
-        
+
         pytester.makepyfile("""
             import pytest_k8s
             from kubernetes import client
@@ -497,10 +507,12 @@ class TestRealIntegrationScenarios:
                 # Should be available for custom resource operations
                 assert custom_objects is not None
         """)
-        
-        result = pytester.runpytest("-v", "--tb=short", "--capture=no", "--log-cli-level=INFO")
+
+        result = pytester.runpytest(
+            "-v", "--tb=short", "--capture=no", "--log-cli-level=INFO"
+        )
         assert result.ret == 0
-    
+
     @pytest.mark.slow
     def test_function_scope_real_isolation(self, pytester):
         """Test that function-scoped fixtures provide real isolation."""
@@ -510,7 +522,7 @@ class TestRealIntegrationScenarios:
             def pytest_configure(config):
                 config.option.k8s_cluster_timeout = 120
         """)
-        
+
         pytester.makepyfile("""
             import pytest
             import pytest_k8s
@@ -567,14 +579,16 @@ class TestRealIntegrationScenarios:
                 assert "isolation-test-1" in cluster_names
                 assert "isolation-test-2" in cluster_names
         """)
-        
-        result = pytester.runpytest("-v", "--tb=short", "--capture=no", "--log-cli-level=INFO")
+
+        result = pytester.runpytest(
+            "-v", "--tb=short", "--capture=no", "--log-cli-level=INFO"
+        )
         assert result.ret == 0
 
 
 class TestAdvancedIntegrationPatterns:
     """Test advanced integration patterns and edge cases."""
-    
+
     def test_fixture_dependency_order(self, pytester):
         """Test that fixture dependency order is handled correctly."""
         pytester.makepyfile("""
@@ -588,17 +602,17 @@ class TestAdvancedIntegrationPatterns:
                 # Standard order should also work
                 assert k8s_client.cluster is k8s_cluster
         """)
-        
-        with patch('pytest_k8s.fixtures.k8s_cluster.KindCluster') as mock_cluster_class:
-            with patch('kubernetes.config.load_kube_config'):
+
+        with patch("pytest_k8s.fixtures.k8s_cluster.KindCluster") as mock_cluster_class:
+            with patch("kubernetes.config.load_kube_config"):
                 mock_cluster = Mock()
                 mock_cluster.name = "dependency-order-cluster"
                 mock_cluster.kubeconfig_path = "/tmp/dependency-kubeconfig"
                 mock_cluster_class.return_value = mock_cluster
-                
+
                 result = pytester.runpytest("-v")
                 assert result.ret == 0
-    
+
     def test_multiple_client_instances_same_cluster(self, pytester):
         """Test behavior when multiple client instances might be created for same cluster."""
         pytester.makepyfile("""
@@ -617,17 +631,17 @@ class TestAdvancedIntegrationPatterns:
                 assert custom_k8s_client.cluster is k8s_cluster
                 assert k8s_client.cluster is custom_k8s_client.cluster
         """)
-        
-        with patch('pytest_k8s.fixtures.k8s_cluster.KindCluster') as mock_cluster_class:
-            with patch('kubernetes.config.load_kube_config'):
+
+        with patch("pytest_k8s.fixtures.k8s_cluster.KindCluster") as mock_cluster_class:
+            with patch("kubernetes.config.load_kube_config"):
                 mock_cluster = Mock()
                 mock_cluster.name = "multi-client-cluster"
                 mock_cluster.kubeconfig_path = "/tmp/multi-client-kubeconfig"
                 mock_cluster_class.return_value = mock_cluster
-                
+
                 result = pytester.runpytest("-v")
                 assert result.ret == 0
-    
+
     def test_fixture_reuse_across_test_classes(self, pytester):
         """Test fixture reuse across different test classes."""
         pytester.makepyfile("""
@@ -645,20 +659,20 @@ class TestAdvancedIntegrationPatterns:
                     # Should be the same cluster due to session scope
                     assert k8s_cluster.name == TestFirstClass.cluster_name
         """)
-        
-        with patch('pytest_k8s.fixtures.k8s_cluster.KindCluster') as mock_cluster_class:
-            with patch('kubernetes.config.load_kube_config'):
+
+        with patch("pytest_k8s.fixtures.k8s_cluster.KindCluster") as mock_cluster_class:
+            with patch("kubernetes.config.load_kube_config"):
                 mock_cluster = Mock()
                 mock_cluster.name = "cross-class-cluster"
                 mock_cluster.kubeconfig_path = "/tmp/cross-class-kubeconfig"
                 mock_cluster_class.return_value = mock_cluster
-                
+
                 result = pytester.runpytest("-v")
                 assert result.ret == 0
-                
+
                 # Should only create one cluster for session scope
                 assert mock_cluster_class.call_count == 1
-    
+
     def test_integration_with_pytest_marks(self, pytester):
         """Test integration with various pytest marks."""
         pytester.makepyfile("""
@@ -679,24 +693,24 @@ class TestAdvancedIntegrationPatterns:
                 # This should not run
                 assert False
         """)
-        
-        with patch('pytest_k8s.fixtures.k8s_cluster.KindCluster') as mock_cluster_class:
-            with patch('kubernetes.config.load_kube_config'):
+
+        with patch("pytest_k8s.fixtures.k8s_cluster.KindCluster") as mock_cluster_class:
+            with patch("kubernetes.config.load_kube_config"):
                 mock_cluster = Mock()
                 mock_cluster.name = "marked-test-cluster"
                 mock_cluster.kubeconfig_path = "/tmp/marked-kubeconfig"
                 mock_cluster_class.return_value = mock_cluster
-                
+
                 result = pytester.runpytest("-v", "-m", "slow")
                 assert result.ret == 0
-                
+
                 # Should only create cluster for non-skipped tests
                 assert mock_cluster_class.call_count == 1
 
 
 class TestComplexIntegrationWorkflows:
     """Test complex integration workflows that combine multiple features."""
-    
+
     def test_end_to_end_application_deployment(self, pytester):
         """Test end-to-end application deployment workflow."""
         pytester.makepyfile("""
@@ -767,34 +781,38 @@ class TestComplexIntegrationWorkflows:
                 core_v1.delete_namespaced_service(name="test-service", namespace="e2e-test")
                 core_v1.delete_namespace(name="e2e-test")
         """)
-        
-        with patch('pytest_k8s.fixtures.k8s_cluster.KindCluster') as mock_cluster_class:
-            with patch('kubernetes.config.load_kube_config'):
-                with patch('kubernetes.client.CoreV1Api') as mock_core_v1:
-                    with patch('kubernetes.client.AppsV1Api') as mock_apps_v1:
+
+        with patch("pytest_k8s.fixtures.k8s_cluster.KindCluster") as mock_cluster_class:
+            with patch("kubernetes.config.load_kube_config"):
+                with patch("kubernetes.client.CoreV1Api") as mock_core_v1:
+                    with patch("kubernetes.client.AppsV1Api") as mock_apps_v1:
                         mock_cluster = Mock()
                         mock_cluster.name = "e2e-deployment-cluster"
                         mock_cluster.kubeconfig_path = "/tmp/e2e-kubeconfig"
                         mock_cluster_class.return_value = mock_cluster
-                        
+
                         # Mock API responses
                         mock_core_instance = Mock()
                         mock_apps_instance = Mock()
                         mock_core_v1.return_value = mock_core_instance
                         mock_apps_v1.return_value = mock_apps_instance
-                        
+
                         # Mock list responses
                         mock_deployment = Mock()
                         mock_deployment.metadata.name = "test-app"
-                        mock_apps_instance.list_namespaced_deployment.return_value = Mock(items=[mock_deployment])
-                        
+                        mock_apps_instance.list_namespaced_deployment.return_value = (
+                            Mock(items=[mock_deployment])
+                        )
+
                         mock_service = Mock()
                         mock_service.metadata.name = "test-service"
-                        mock_core_instance.list_namespaced_service.return_value = Mock(items=[mock_service])
-                        
+                        mock_core_instance.list_namespaced_service.return_value = Mock(
+                            items=[mock_service]
+                        )
+
                         result = pytester.runpytest("-v")
                         assert result.ret == 0
-    
+
     def test_multi_cluster_scenario_simulation(self, pytester):
         """Test simulation of multi-cluster scenarios using function scope."""
         pytester.makepyfile("""
@@ -836,29 +854,29 @@ class TestComplexIntegrationWorkflows:
                 for config in cluster_configs:
                     assert config["name"] == config["client_cluster"]
         """)
-        
-        with patch('pytest_k8s.fixtures.k8s_cluster.KindCluster') as mock_cluster_class:
-            with patch('kubernetes.config.load_kube_config'):
+
+        with patch("pytest_k8s.fixtures.k8s_cluster.KindCluster") as mock_cluster_class:
+            with patch("kubernetes.config.load_kube_config"):
                 mock_cluster_east = Mock()
                 mock_cluster_east.name = "cluster-east"
                 mock_cluster_east.kubeconfig_path = "/tmp/east-kubeconfig"
-                
+
                 mock_cluster_west = Mock()
                 mock_cluster_west.name = "cluster-west"
                 mock_cluster_west.kubeconfig_path = "/tmp/west-kubeconfig"
-                
+
                 mock_cluster_class.side_effect = [mock_cluster_east, mock_cluster_west]
-                
+
                 result = pytester.runpytest("-v")
                 assert result.ret == 0
-                
+
                 # Should create two clusters for the two parameter sets
                 assert mock_cluster_class.call_count == 2
 
 
 class TestPerformanceAndStressIntegration:
     """Test performance and stress scenarios for fixture integration."""
-    
+
     def test_concurrent_api_operations_simulation(self, pytester):
         """Test simulation of concurrent API operations."""
         pytester.makepyfile("""
@@ -896,21 +914,21 @@ class TestPerformanceAndStressIntegration:
                 assert networking_v1 is not None
                 assert rbac_v1 is not None
         """)
-        
-        with patch('pytest_k8s.fixtures.k8s_cluster.KindCluster') as mock_cluster_class:
-            with patch('kubernetes.config.load_kube_config'):
+
+        with patch("pytest_k8s.fixtures.k8s_cluster.KindCluster") as mock_cluster_class:
+            with patch("kubernetes.config.load_kube_config"):
                 mock_cluster = Mock()
                 mock_cluster.name = "concurrent-ops-cluster"
                 mock_cluster.kubeconfig_path = "/tmp/concurrent-kubeconfig"
                 mock_cluster_class.return_value = mock_cluster
-                
+
                 result = pytester.runpytest("-v")
                 assert result.ret == 0
 
 
 class TestDocumentationAndExamples:
     """Test that integration examples work as documented."""
-    
+
     def test_basic_usage_example(self, pytester):
         """Test the basic usage example from documentation."""
         pytester.makepyfile("""
@@ -934,17 +952,17 @@ class TestDocumentationAndExamples:
                 core_v1 = k8s_client.CoreV1Api
                 assert core_v1 is not None
         """)
-        
-        with patch('pytest_k8s.fixtures.k8s_cluster.KindCluster') as mock_cluster_class:
-            with patch('kubernetes.config.load_kube_config'):
+
+        with patch("pytest_k8s.fixtures.k8s_cluster.KindCluster") as mock_cluster_class:
+            with patch("kubernetes.config.load_kube_config"):
                 mock_cluster = Mock()
                 mock_cluster.name = "basic-example-cluster"
                 mock_cluster.kubeconfig_path = "/tmp/basic-kubeconfig"
                 mock_cluster_class.return_value = mock_cluster
-                
+
                 result = pytester.runpytest("-v")
                 assert result.ret == 0
-    
+
     def test_parameterized_usage_example(self, pytester):
         """Test parameterized usage example from documentation."""
         pytester.makepyfile("""
@@ -964,18 +982,18 @@ class TestDocumentationAndExamples:
                 core_v1 = k8s_client.CoreV1Api
                 assert core_v1 is not None
         """)
-        
-        with patch('pytest_k8s.fixtures.k8s_cluster.KindCluster') as mock_cluster_class:
-            with patch('kubernetes.config.load_kube_config'):
+
+        with patch("pytest_k8s.fixtures.k8s_cluster.KindCluster") as mock_cluster_class:
+            with patch("kubernetes.config.load_kube_config"):
                 mock_cluster = Mock()
                 mock_cluster.name = "test-cluster"
                 mock_cluster.kubeconfig_path = "/tmp/param-kubeconfig"
                 mock_cluster_class.return_value = mock_cluster
-                
+
                 result = pytester.runpytest("-v")
                 assert result.ret == 0
-                
+
                 # Verify parameterized configuration was used
                 call_args = mock_cluster_class.call_args
-                assert call_args[1]['name'] == "test-cluster"
-                assert call_args[1]['timeout'] == 300
+                assert call_args[1]["name"] == "test-cluster"
+                assert call_args[1]["timeout"] == 300

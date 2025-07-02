@@ -12,11 +12,11 @@ from typing import Optional, Any
 class KindLoggingConfig:
     """
     Configuration for kind command logging and streaming.
-    
+
     This class manages the configuration for how kind command output
     is logged and streamed during test execution.
     """
-    
+
     def __init__(
         self,
         stream_logs: bool = True,
@@ -26,7 +26,7 @@ class KindLoggingConfig:
     ):
         """
         Initialize kind logging configuration.
-        
+
         Args:
             stream_logs: Whether to enable real-time log streaming
             log_level: Log level for all kind messages (DEBUG, INFO, WARNING, ERROR)
@@ -37,18 +37,18 @@ class KindLoggingConfig:
         self.log_level = self._parse_log_level(log_level)
         self.log_format = log_format
         self.include_stream_info = include_stream_info
-    
+
     @staticmethod
     def _parse_log_level(level: str) -> int:
         """
         Parse string log level to logging constant.
-        
+
         Args:
             level: Log level as string (DEBUG, INFO, WARNING, ERROR)
-            
+
         Returns:
             Logging level constant
-            
+
         Raises:
             ValueError: If log level is invalid
         """
@@ -58,24 +58,24 @@ class KindLoggingConfig:
             "WARNING": logging.WARNING,
             "ERROR": logging.ERROR,
         }
-        
+
         level_upper = level.upper()
         if level_upper not in level_map:
             raise ValueError(
                 f"Invalid log level: {level}. "
                 f"Must be one of: {', '.join(level_map.keys())}"
             )
-        
+
         return level_map[level_upper]
-    
+
     @classmethod
     def from_pytest_config(cls, pytest_config: Any) -> "KindLoggingConfig":
         """
         Create configuration from pytest config object.
-        
+
         Args:
             pytest_config: Pytest configuration object
-            
+
         Returns:
             KindLoggingConfig instance
         """
@@ -83,25 +83,27 @@ class KindLoggingConfig:
         stream_logs = pytest_config.getoption("k8s_kind_stream_logs", True)
         log_level = pytest_config.getoption("k8s_kind_log_level", "INFO")
         log_format = pytest_config.getoption("k8s_kind_log_format", "[KIND] {message}")
-        include_stream_info = pytest_config.getoption("k8s_kind_include_stream_info", False)
-        
+        include_stream_info = pytest_config.getoption(
+            "k8s_kind_include_stream_info", False
+        )
+
         return cls(
             stream_logs=stream_logs,
             log_level=log_level,
             log_format=log_format,
             include_stream_info=include_stream_info,
         )
-    
+
     @classmethod
     def get_default(cls) -> "KindLoggingConfig":
         """
         Get default configuration.
-        
+
         Returns:
             KindLoggingConfig with default settings
         """
         return cls()
-    
+
     def __repr__(self) -> str:
         """String representation of configuration."""
         return (
@@ -117,87 +119,83 @@ class KindLoggingConfig:
 class ClusterConfig:
     """
     Configuration for cluster fixtures.
-    
+
     This class manages configuration settings for k8s cluster fixtures.
     """
-    
+
     def __init__(
         self,
         default_scope: str = "session",
     ):
         """
         Initialize cluster configuration.
-        
+
         Args:
             default_scope: Default scope for k8s_cluster fixture
         """
         self.default_scope = default_scope
-    
+
     @classmethod
     def from_pytest_config(cls, pytest_config: Any) -> "ClusterConfig":
         """
         Create configuration from pytest config object.
-        
+
         Args:
             pytest_config: Pytest configuration object
-            
+
         Returns:
             ClusterConfig instance
         """
         default_scope = pytest_config.getoption("k8s_cluster_scope", "session")
-        
+
         return cls(
             default_scope=default_scope,
         )
-    
+
     @classmethod
     def get_default(cls) -> "ClusterConfig":
         """
         Get default configuration.
-        
+
         Returns:
             ClusterConfig with default settings
         """
         return cls()
-    
+
     def __repr__(self) -> str:
         """String representation of configuration."""
-        return (
-            f"ClusterConfig("
-            f"default_scope='{self.default_scope}'"
-            f")"
-        )
+        return f"ClusterConfig(default_scope='{self.default_scope}')"
 
 
 class PluginConfig:
     """
     Global configuration for the pytest-k8s plugin.
-    
+
     This class manages all plugin-wide configuration settings
     and provides access to subsystem configurations.
     """
-    
+
     def __init__(self, pytest_config: Optional[Any] = None):
         """
         Initialize plugin configuration.
-        
+
         Args:
             pytest_config: Pytest configuration object
         """
         self.pytest_config = pytest_config
-        
+
         if pytest_config:
             self.kind_logging = KindLoggingConfig.from_pytest_config(pytest_config)
             self.cluster = ClusterConfig.from_pytest_config(pytest_config)
         else:
             self.kind_logging = KindLoggingConfig.get_default()
             self.cluster = ClusterConfig.get_default()
-    
+
     @classmethod
     def get_default(cls) -> "PluginConfig":
         """
         Get default plugin configuration.
-        
+
         Returns:
             PluginConfig with default settings
         """
@@ -211,7 +209,7 @@ _global_config: Optional[PluginConfig] = None
 def get_plugin_config() -> PluginConfig:
     """
     Get the global plugin configuration.
-    
+
     Returns:
         Current plugin configuration
     """
@@ -224,7 +222,7 @@ def get_plugin_config() -> PluginConfig:
 def set_plugin_config(config: PluginConfig) -> None:
     """
     Set the global plugin configuration.
-    
+
     Args:
         config: Plugin configuration to set
     """
