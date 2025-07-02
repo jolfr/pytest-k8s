@@ -50,9 +50,15 @@ class KubernetesClient:
             raise ValueError("Cluster does not have a kubeconfig path")
         
         try:
-            # Load the kubeconfig from the cluster's kubeconfig file
-            config.load_kube_config(config_file=self.cluster.kubeconfig_path)
-            logger.info(f"Loaded kubeconfig from: {self.cluster.kubeconfig_path}")
+            # The context name for kind clusters is "kind-{cluster_name}"
+            context_name = f"kind-{self.cluster.name}"
+            
+            # Load the kubeconfig from the cluster's kubeconfig file with specific context
+            config.load_kube_config(
+                config_file=self.cluster.kubeconfig_path,
+                context=context_name
+            )
+            logger.info(f"Loaded kubeconfig from: {self.cluster.kubeconfig_path} with context: {context_name}")
         except Exception as e:
             raise RuntimeError(f"Failed to load kubeconfig: {e}")
     
@@ -124,7 +130,7 @@ class KubernetesClient:
         return f"KubernetesClient(cluster={self.cluster.name}, kubeconfig={self.cluster.kubeconfig_path})"
 
 
-@pytest.fixture(scope="session")
+@pytest.fixture(scope="function")
 def k8s_client(request):
     """
     Create and manage a Kubernetes API client for testing.
