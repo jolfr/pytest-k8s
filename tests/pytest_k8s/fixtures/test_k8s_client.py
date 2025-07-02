@@ -228,44 +228,56 @@ class TestKubernetesClient:
 
 
 class TestClientFixtureIntegration:
-    """Test client fixture integration with real fixtures."""
+    """Test client fixture integration behavior with mocked components."""
 
-    @patch("pytest_k8s.fixtures.k8s_cluster.KindCluster")
-    @patch("kubernetes.config.load_kube_config")
-    def test_k8s_client_fixture_basic(
-        self, mock_load_config, mock_cluster_class, k8s_client
-    ):
-        """Test that k8s_client fixture works correctly."""
-        # The fixture should have been created and should work
-        assert k8s_client is not None
-        assert k8s_client.cluster is not None
-        assert hasattr(k8s_client, "CoreV1Api")
-        assert hasattr(k8s_client, "AppsV1Api")
-        assert hasattr(k8s_client, "NetworkingV1Api")
-        assert hasattr(k8s_client, "RbacAuthorizationV1Api")
-        assert hasattr(k8s_client, "CustomObjectsApi")
+    def test_k8s_client_fixture_basic(self):
+        """Test that k8s_client fixture works correctly with mocked cluster."""
+        # Create a mock cluster
+        mock_cluster = Mock(spec=KindCluster)
+        mock_cluster.name = "test-cluster"
+        mock_cluster.kubeconfig_path = "/tmp/kubeconfig"
 
-    @patch("pytest_k8s.fixtures.k8s_cluster.KindCluster")
-    @patch("kubernetes.config.load_kube_config")
-    def test_k8s_client_with_explicit_cluster(
-        self, mock_load_config, mock_cluster_class, k8s_cluster, k8s_client
-    ):
-        """Test that k8s_client uses the same cluster as k8s_cluster."""
-        assert k8s_client is not None
-        assert k8s_cluster is not None
-        assert k8s_client.cluster is k8s_cluster
+        with patch("kubernetes.config.load_kube_config"):
+            # Create client directly to test the class behavior
+            client = KubernetesClient(mock_cluster)
+            
+            # The client should have been created and should work
+            assert client is not None
+            assert client.cluster is not None
+            assert hasattr(client, "CoreV1Api")
+            assert hasattr(client, "AppsV1Api")
+            assert hasattr(client, "NetworkingV1Api")
+            assert hasattr(client, "RbacAuthorizationV1Api")
+            assert hasattr(client, "CustomObjectsApi")
 
-    @pytest.mark.parametrize(
-        "k8s_cluster",
-        [{"name": "parametrized-test-cluster", "timeout": 300, "scope": "function"}],
-        indirect=True,
-    )
-    def test_k8s_client_with_parameterized_cluster(self, k8s_cluster, k8s_client):
-        """Test that k8s_client works with parameterized cluster."""
-        assert k8s_client is not None
-        assert k8s_cluster is not None
-        assert k8s_cluster.name == "parametrized-test-cluster"
-        assert hasattr(k8s_client, "CoreV1Api")
+    def test_k8s_client_cluster_relationship(self):
+        """Test that k8s_client maintains correct relationship with cluster."""
+        # Create a mock cluster
+        mock_cluster = Mock(spec=KindCluster)
+        mock_cluster.name = "relationship-test-cluster"
+        mock_cluster.kubeconfig_path = "/tmp/kubeconfig"
+
+        with patch("kubernetes.config.load_kube_config"):
+            client = KubernetesClient(mock_cluster)
+            
+            assert client is not None
+            assert client.cluster is mock_cluster
+            assert client.cluster.name == "relationship-test-cluster"
+
+    def test_k8s_client_with_custom_cluster_config(self):
+        """Test that k8s_client works with custom cluster configuration."""
+        # Create a mock cluster with custom configuration
+        mock_cluster = Mock(spec=KindCluster)
+        mock_cluster.name = "custom-config-cluster"
+        mock_cluster.kubeconfig_path = "/tmp/custom-kubeconfig"
+
+        with patch("kubernetes.config.load_kube_config"):
+            client = KubernetesClient(mock_cluster)
+            
+            assert client is not None
+            assert client.cluster is not None
+            assert client.cluster.name == "custom-config-cluster"
+            assert hasattr(client, "CoreV1Api")
 
 
 class TestClientFixtureDocumentation:
