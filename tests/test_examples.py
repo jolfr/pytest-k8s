@@ -312,10 +312,7 @@ def test_multiple_api_clients(k8s_client):
     print("✓ Successfully accessed all API client types")
 
 
-@pytest.mark.parametrize("k8s_cluster", [
-    {"name": "deployment-test-cluster", "scope": "function"}
-], indirect=True)
-def test_deployment_lifecycle(k8s_cluster, k8s_client):
+def test_deployment_lifecycle(k8s_client):
     """
     Example of complete deployment lifecycle testing.
     
@@ -398,10 +395,7 @@ def test_deployment_lifecycle(k8s_cluster, k8s_client):
 # Resource Management Examples
 # =============================================================================
 
-@pytest.mark.parametrize("k8s_cluster", [
-    {"name": "resource-test-cluster", "scope": "function"}
-], indirect=True)
-def test_configmap_and_secret_management(k8s_cluster, k8s_client):
+def test_configmap_and_secret_management(k8s_client):
     """
     Example of ConfigMap and Secret management.
     
@@ -476,10 +470,7 @@ def test_configmap_and_secret_management(k8s_cluster, k8s_client):
 # Service and Networking Examples
 # =============================================================================
 
-@pytest.mark.parametrize("k8s_cluster", [
-    {"name": "networking-test-cluster", "scope": "function"}
-], indirect=True)
-def test_service_creation_and_discovery(k8s_cluster, k8s_client):
+def test_service_creation_and_discovery(k8s_client):
     """
     Example of Service creation and service discovery.
     
@@ -578,7 +569,7 @@ def test_service_creation_and_discovery(k8s_cluster, k8s_client):
 # Error Handling and Edge Cases
 # =============================================================================
 
-def test_cluster_error_handling(k8s_cluster, k8s_client):
+def test_cluster_error_handling(k8s_client):
     """
     Example of error handling with cluster and client fixtures.
     

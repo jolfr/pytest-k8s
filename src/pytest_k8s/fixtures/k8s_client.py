@@ -130,23 +130,59 @@ class KubernetesClient:
         return f"KubernetesClient(cluster={self.cluster.name}, kubeconfig={self.cluster.kubeconfig_path})"
 
 
-@pytest.fixture(scope="session")
-def k8s_client(request):
+# Global cache for client instances per cluster to ensure proper scope inheritance
+_client_cache = {}
+
+
+def _get_or_create_client(cluster, request):
+    """
+    Get or create a client for the given cluster, ensuring proper scope management.
+    
+    This function ensures that clients are created and cached appropriately
+    based on the cluster's lifecycle.
+    """
+    cluster_id = id(cluster)
+    
+    # Check if we already have a client for this cluster
+    if cluster_id in _client_cache:
+        existing_client = _client_cache[cluster_id]
+        logger.info(f"Reusing existing Kubernetes client for cluster: {cluster.name}")
+        return existing_client
+    
+    # Create a new client
+    logger.info(f"Creating Kubernetes client for cluster: {cluster.name}")
+    k8s_client_instance = KubernetesClient(cluster)
+    
+    # Cache the client
+    _client_cache[cluster_id] = k8s_client_instance
+    
+    # Register cleanup that removes from cache and closes the client
+    def cleanup():
+        logger.info(f"Cleaning up Kubernetes client for cluster: {cluster.name}")
+        if cluster_id in _client_cache:
+            del _client_cache[cluster_id]
+        k8s_client_instance.close()
+    
+    request.addfinalizer(cleanup)
+    
+    return k8s_client_instance
+
+
+@pytest.fixture
+def k8s_client(request, k8s_cluster):
     """
     Create and manage a Kubernetes API client for testing.
     
     This fixture creates a Kubernetes client that connects to a kind cluster.
     It automatically uses the k8s_cluster fixture to get cluster connection details.
-    The scope matches the k8s_cluster fixture scope based on plugin configuration.
+    The scope is inherited from the k8s_cluster fixture being used.
     
     Args:
         request: Pytest request object containing fixture parameters.
+        k8s_cluster: The cluster fixture to connect to.
         
     Returns:
         KubernetesClient instance ready for testing.
-        
-    Fixture Parameters:
-        scope (str, optional): Override the default scope for this specific client.
         
     Example:
         def test_with_client(k8s_client):
@@ -158,46 +194,11 @@ def k8s_client(request):
             # k8s_client uses the same cluster as k8s_cluster
             assert k8s_client.cluster is k8s_cluster
             
-        @pytest.mark.parametrize("k8s_client", [
+        @pytest.mark.parametrize("k8s_cluster", [
             {"scope": "function"}
         ], indirect=True)
-        def test_with_function_scope(k8s_client):
-            # This client will have function scope
-            assert k8s_client.cluster.is_ready()
+        def test_with_function_scope(k8s_cluster, k8s_client):
+            # This client will inherit function scope from the cluster
+            assert k8s_client.cluster is k8s_cluster
     """
-    # Get fixture parameters
-    params = getattr(request, 'param', {})
-    if not isinstance(params, dict):
-        params = {}
-    
-    # Get the default scope from configuration (same as k8s_cluster)
-    from ..config import get_plugin_config
-    plugin_config = get_plugin_config()
-    default_scope = plugin_config.cluster.default_scope
-    
-    # Extract scope override if provided
-    effective_scope = params.pop('scope', default_scope)
-    
-    # Check if cluster is already provided in the request
-    cluster = None
-    for fixture_name in request.fixturenames:
-        if fixture_name.startswith('k8s_cluster'):
-            cluster = request.getfixturevalue(fixture_name)
-            break
-    
-    # If no cluster found, request the default cluster
-    if cluster is None:
-        cluster = request.getfixturevalue("k8s_cluster")
-    
-    # Create the client
-    logger.info(f"Creating Kubernetes client for cluster: {cluster.name} (scope: {effective_scope})")
-    k8s_client_instance = KubernetesClient(cluster)
-    
-    # Register cleanup
-    def cleanup():
-        logger.info(f"Cleaning up Kubernetes client for cluster: {cluster.name}")
-        k8s_client_instance.close()
-    
-    request.addfinalizer(cleanup)
-    
-    return k8s_client_instance
+    return _get_or_create_client(k8s_cluster, request)
