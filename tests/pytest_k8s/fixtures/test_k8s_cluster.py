@@ -163,10 +163,20 @@ class TestClusterFixtureManager:
 
 
 class TestFixtureScopes:
-    """Test fixture scopes using pytester."""
+    """Test fixture scopes using pytester with real clusters."""
     
+    @pytest.mark.slow
     def test_session_scope_cluster_reuse(self, pytester):
         """Test that session-scoped cluster is reused across tests."""
+        # Create a conftest.py to configure the plugin for faster testing
+        pytester.makeconftest("""
+            import pytest
+            
+            def pytest_configure(config):
+                # Configure pytest-k8s for faster testing
+                config.option.k8s_cluster_timeout = 120
+        """)
+        
         pytester.makepyfile("""
             import pytest_k8s
             
@@ -175,30 +185,33 @@ class TestFixtureScopes:
             def test_first_cluster_access(k8s_cluster):
                 cluster_names.append(k8s_cluster.name)
                 assert k8s_cluster is not None
+                assert k8s_cluster.is_ready()
                 
             def test_second_cluster_access(k8s_cluster):
                 cluster_names.append(k8s_cluster.name)
                 assert k8s_cluster is not None
+                assert k8s_cluster.is_ready()
                 
             def test_cluster_reuse():
                 # Both tests should use the same cluster
-                assert len(set(cluster_names)) == 1
+                assert len(set(cluster_names)) == 1, f"Expected 1 unique cluster, got {len(set(cluster_names))}: {cluster_names}"
         """)
         
-        # Mock the KindCluster to avoid actual cluster creation
-        with patch('pytest_k8s.fixtures.k8s_cluster.KindCluster') as mock_kind:
-            mock_cluster = Mock()
-            mock_cluster.name = "session-cluster"
-            mock_kind.return_value = mock_cluster
-            
-            result = pytester.runpytest("-v")
-            assert result.ret == 0
-            
-            # Verify cluster was created only once for session scope
-            assert mock_kind.call_count == 1
+        result = pytester.runpytest("-v", "--tb=short", "--capture=no", "--log-cli-level=INFO")
+        assert result.ret == 0
     
+    @pytest.mark.slow
     def test_function_scope_cluster_per_test(self, pytester):
         """Test that function-scoped cluster creates new cluster per test."""
+        # Create a conftest.py to configure the plugin for faster testing
+        pytester.makeconftest("""
+            import pytest
+            
+            def pytest_configure(config):
+                # Configure pytest-k8s for faster testing
+                config.option.k8s_cluster_timeout = 120
+        """)
+        
         pytester.makepyfile("""
             import pytest
             import pytest_k8s
@@ -206,38 +219,28 @@ class TestFixtureScopes:
             cluster_names = []
             
             @pytest.mark.parametrize("k8s_cluster", [
-                {"scope": "function"}
+                {"scope": "function", "timeout": 120}
             ], indirect=True)
             def test_first_function_cluster(k8s_cluster):
                 cluster_names.append(k8s_cluster.name)
                 assert k8s_cluster is not None
+                assert k8s_cluster.is_ready()
                 
             @pytest.mark.parametrize("k8s_cluster", [
-                {"scope": "function"}
+                {"scope": "function", "timeout": 120}
             ], indirect=True)
             def test_second_function_cluster(k8s_cluster):
                 cluster_names.append(k8s_cluster.name)
                 assert k8s_cluster is not None
+                assert k8s_cluster.is_ready()
                 
             def test_different_clusters():
                 # Each test should get a different cluster
-                assert len(set(cluster_names)) == 2
+                assert len(set(cluster_names)) == 2, f"Expected 2 unique clusters, got {len(set(cluster_names))}: {cluster_names}"
         """)
         
-        # Mock the KindCluster to avoid actual cluster creation
-        with patch('pytest_k8s.fixtures.k8s_cluster.KindCluster') as mock_kind:
-            # Create different mock clusters for each call
-            mock_cluster1 = Mock()
-            mock_cluster1.name = "function-cluster-1"
-            mock_cluster2 = Mock()
-            mock_cluster2.name = "function-cluster-2"
-            mock_kind.side_effect = [mock_cluster1, mock_cluster2]
-            
-            result = pytester.runpytest("-v")
-            assert result.ret == 0
-            
-            # Verify cluster was created twice for function scope
-            assert mock_kind.call_count == 2
+        result = pytester.runpytest("-v", "--tb=short", "--capture=no", "--log-cli-level=INFO")
+        assert result.ret == 0
 
 
 class TestFixtureConfiguration:

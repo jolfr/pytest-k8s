@@ -29,6 +29,10 @@ addopts = [
     "--k8s-cluster-scope=session",  # Default cluster scope
 ]
 pytester_example_dir = "tests/pytest_k8s/fixtures"
+markers = [
+    "slow: marks tests as slow running tests",
+    "integration: marks tests as integration tests",
+]
 
 [dependency-groups]
 dev = [
