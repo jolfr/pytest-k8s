@@ -215,7 +215,7 @@ class TestClusterCleanupManager:
         # Reset the singleton instance for this test
         original_instance = ClusterCleanupManager._instance
         ClusterCleanupManager._instance = None
-        
+
         try:
             with patch("atexit.register") as mock_atexit:
                 manager = ClusterCleanupManager()
@@ -359,9 +359,11 @@ class TestCleanupConfiguration:
         # Reset the singleton instance for this test
         original_instance = ClusterCleanupManager._instance
         ClusterCleanupManager._instance = None
-        
+
         try:
-            with patch("pytest_k8s.cleanup.PersistentClusterTracker") as mock_tracker_class:
+            with patch(
+                "pytest_k8s.cleanup.PersistentClusterTracker"
+            ) as mock_tracker_class:
                 mock_tracker = Mock()
                 mock_tracker_class.return_value = mock_tracker
 
