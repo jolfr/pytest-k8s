@@ -16,33 +16,8 @@ permissions:
   contents: read
 
 jobs:
-  release-build:
-    runs-on: ubuntu-latest
-
-    steps:
-      - uses: actions/checkout@v4
-
-      - uses: actions/setup-python@v5
-        with:
-          python-version: "3.x"
-
-      - name: Install uv
-        uses: astral-sh/setup-uv@v5
-
-      - name: Build release distributions
-        run: |
-          uv build
-
-      - name: Upload distributions
-        uses: actions/upload-artifact@v4
-        with:
-          name: release-dists
-          path: dist/
-
   pypi-publish:
     runs-on: ubuntu-latest
-    needs:
-      - release-build
     permissions:
       # IMPORTANT: this permission is mandatory for trusted publishing
       id-token: write
@@ -59,11 +34,23 @@ jobs:
       # url: https://pypi.org/project/YOURPROJECT/${{ github.event.release.name }}
 
     steps:
-      - name: Retrieve release distributions
-        uses: actions/download-artifact@v4
-        with:
-          name: release-dists
-          path: dist/
+      - name: Download release assets
+        run: |
+          mkdir -p dist
+          # Extract version from release tag (remove 'v' prefix)
+          VERSION="${{ github.event.release.tag_name }}"
+          VERSION="${VERSION#v}"
+          
+          # Download wheel
+          curl -L -o "dist/pytest_k8s-${VERSION}-py3-none-any.whl" \
+            "https://github.com/${{ github.repository }}/releases/download/${{ github.event.release.tag_name }}/pytest_k8s-${VERSION}-py3-none-any.whl"
+          
+          # Download sdist
+          curl -L -o "dist/pytest_k8s-${VERSION}.tar.gz" \
+            "https://github.com/${{ github.repository }}/releases/download/${{ github.event.release.tag_name }}/pytest_k8s-${VERSION}.tar.gz"
+          
+          # List downloaded files
+          ls -la dist/
 
       - name: Publish release distributions to PyPI
         uses: pypa/gh-action-pypi-publish@release/v1

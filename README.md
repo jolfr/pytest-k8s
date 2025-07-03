@@ -693,6 +693,69 @@ Contributions are welcome! Please feel free to submit a Pull Request. For major 
 2. Ensure all tests pass
 3. Follow PEP 8 style guidelines
 4. Add documentation for new fixtures or features
+5. Use [Conventional Commits](https://www.conventionalcommits.org/) for commit messages
+
+### Commit Message Format
+
+This project uses Conventional Commits for automated versioning and changelog generation. Please format your commit messages as follows:
+
+```
+<type>[optional scope]: <description>
+
+[optional body]
+
+[optional footer(s)]
+```
+
+#### Types
+
+- `feat`: A new feature (triggers minor version bump)
+- `fix`: A bug fix (triggers patch version bump)
+- `perf`: Performance improvements (triggers patch version bump)
+- `docs`: Documentation only changes
+- `style`: Changes that don't affect code meaning (white-space, formatting, etc.)
+- `refactor`: Code changes that neither fix bugs nor add features
+- `test`: Adding or updating tests
+- `chore`: Changes to build process or auxiliary tools
+- `ci`: Changes to CI configuration files and scripts
+
+#### Examples
+
+```bash
+# Feature
+feat: add support for custom cluster configurations
+
+# Bug fix
+fix: handle cluster cleanup on interrupt signals
+
+# Breaking change (triggers major version bump)
+feat!: change k8s_client fixture API
+
+BREAKING CHANGE: k8s_client now returns a wrapper object instead of raw client
+
+# Documentation
+docs: update installation instructions for macOS
+
+# With scope
+feat(fixtures): add new k8s_namespace fixture for isolated testing
+```
+
+### Release Process
+
+Releases are automated using GitHub Actions and semantic-release. When commits are pushed to the `main` branch:
+
+1. Tests are run to ensure code quality
+2. The workflow analyzes commit messages to determine if a release is needed
+3. If a release is needed, it automatically:
+   - Bumps the version in `pyproject.toml`
+   - Updates the `CHANGELOG.md`
+   - Creates a git tag
+   - Creates a GitHub release with release notes
+4. When a release is published, a separate workflow automatically:
+   - Builds the Python package
+   - Publishes to PyPI
+
+No manual version management is required - just use conventional commits and the automation handles the rest.
 
 ## License
 
