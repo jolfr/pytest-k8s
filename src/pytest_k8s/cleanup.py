@@ -25,7 +25,7 @@ logger = logging.getLogger(__name__)
 class PersistentClusterTracker:
     """
     Tracks active clusters in persistent storage for recovery after crashes.
-    
+
     This class maintains a JSON file with information about active clusters,
     allowing cleanup of orphaned clusters from previous sessions that crashed
     or were forcibly terminated.
@@ -34,20 +34,20 @@ class PersistentClusterTracker:
     def __init__(self, state_dir: Optional[Path] = None):
         """
         Initialize the persistent cluster tracker.
-        
+
         Args:
             state_dir: Directory to store state file. Defaults to ~/.pytest-k8s
         """
         if state_dir is None:
             state_dir = Path.home() / ".pytest-k8s"
-        
+
         self.state_dir = state_dir
         self.state_file = state_dir / "active_clusters.json"
         self.lock_file = state_dir / "active_clusters.lock"
-        
+
         # Ensure state directory exists
         self.state_dir.mkdir(exist_ok=True)
-        
+
         # Initialize state
         self.state: Dict[str, dict] = {}
         self._load_state()
@@ -56,7 +56,7 @@ class PersistentClusterTracker:
         """Load cluster state from persistent storage."""
         try:
             if self.state_file.exists():
-                with open(self.state_file, 'r') as f:
+                with open(self.state_file, "r") as f:
                     self.state = json.load(f)
                 logger.debug(f"Loaded cluster state: {list(self.state.keys())}")
             else:
@@ -69,8 +69,8 @@ class PersistentClusterTracker:
         """Save cluster state to persistent storage."""
         try:
             # Use atomic write with temporary file
-            temp_file = self.state_file.with_suffix('.tmp')
-            with open(temp_file, 'w') as f:
+            temp_file = self.state_file.with_suffix(".tmp")
+            with open(temp_file, "w") as f:
                 json.dump(self.state, f, indent=2)
             temp_file.replace(self.state_file)
             logger.debug(f"Saved cluster state: {list(self.state.keys())}")
@@ -80,14 +80,14 @@ class PersistentClusterTracker:
     def add_cluster(self, name: str) -> None:
         """
         Add a cluster to the tracking state.
-        
+
         Args:
             name: Cluster name to track
         """
         self.state[name] = {
             "created_at": time.time(),
             "pid": os.getpid(),
-            "session_id": id(self)  # Unique session identifier
+            "session_id": id(self),  # Unique session identifier
         }
         self._save_state()
         logger.debug(f"Added cluster to tracking: {name}")
@@ -95,7 +95,7 @@ class PersistentClusterTracker:
     def remove_cluster(self, name: str) -> None:
         """
         Remove a cluster from the tracking state.
-        
+
         Args:
             name: Cluster name to remove
         """
@@ -107,7 +107,7 @@ class PersistentClusterTracker:
     def get_tracked_clusters(self) -> Set[str]:
         """
         Get set of currently tracked cluster names.
-        
+
         Returns:
             Set of cluster names being tracked
         """
@@ -116,20 +116,22 @@ class PersistentClusterTracker:
     def cleanup_orphaned_clusters(self) -> None:
         """
         Clean up clusters from previous sessions that may have crashed.
-        
+
         This method identifies clusters that were created by processes that
         are no longer running and attempts to clean them up.
         """
         orphaned_clusters = []
-        
+
         for name, info in list(self.state.items()):
             pid = info.get("pid")
             if pid and not self._is_process_running(pid):
                 orphaned_clusters.append(name)
-        
+
         if orphaned_clusters:
-            logger.info(f"Found {len(orphaned_clusters)} orphaned clusters: {orphaned_clusters}")
-            
+            logger.info(
+                f"Found {len(orphaned_clusters)} orphaned clusters: {orphaned_clusters}"
+            )
+
             for name in orphaned_clusters:
                 try:
                     # Check if cluster actually exists before trying to delete
@@ -148,10 +150,10 @@ class PersistentClusterTracker:
     def _is_process_running(self, pid: int) -> bool:
         """
         Check if a process is still running.
-        
+
         Args:
             pid: Process ID to check
-            
+
         Returns:
             True if process is running, False otherwise
         """
@@ -166,7 +168,7 @@ class PersistentClusterTracker:
 class ClusterCleanupManager:
     """
     Comprehensive cluster cleanup manager with multiple safety mechanisms.
-    
+
     This class provides robust cleanup handling for kind clusters, including:
     - Signal handlers for interrupts (SIGINT, SIGTERM)
     - Atexit handlers for normal termination
@@ -175,10 +177,10 @@ class ClusterCleanupManager:
     - Thread-safe operations
     """
 
-    _instance: Optional['ClusterCleanupManager'] = None
+    _instance: Optional["ClusterCleanupManager"] = None
     _lock = threading.Lock()
 
-    def __new__(cls) -> 'ClusterCleanupManager':
+    def __new__(cls) -> "ClusterCleanupManager":
         """Singleton pattern to ensure only one cleanup manager exists."""
         with cls._lock:
             if cls._instance is None:
@@ -190,18 +192,18 @@ class ClusterCleanupManager:
         """Initialize the cleanup manager (only once due to singleton)."""
         if self._initialized:
             return
-        
+
         self._initialized = True
         self._clusters: weakref.WeakValueDictionary = weakref.WeakValueDictionary()
         self._cleanup_in_progress = False
         self._original_handlers: Dict[int, object] = {}
         self._persistent_tracker = PersistentClusterTracker()
         self._lock = threading.RLock()
-        
+
         # Register cleanup handlers
         self._register_signal_handlers()
         self._register_atexit_handler()
-        
+
         # Clean up any orphaned clusters from previous runs
         try:
             self._persistent_tracker.cleanup_orphaned_clusters()
@@ -211,11 +213,11 @@ class ClusterCleanupManager:
     def _register_signal_handlers(self) -> None:
         """Register signal handlers for graceful shutdown on interrupts."""
         signals_to_handle = [signal.SIGINT, signal.SIGTERM]
-        
+
         # On Windows, SIGTERM might not be available
-        if os.name == 'nt':
+        if os.name == "nt":
             signals_to_handle = [signal.SIGINT]
-        
+
         for sig in signals_to_handle:
             try:
                 original_handler = signal.signal(sig, self._signal_handler)
@@ -232,14 +234,14 @@ class ClusterCleanupManager:
     def _signal_handler(self, signum: int, frame) -> None:
         """
         Handle interrupt signals by cleaning up clusters.
-        
+
         Args:
             signum: Signal number
             frame: Current stack frame
         """
         logger.info(f"Received signal {signum}, initiating cluster cleanup...")
         self._cleanup_all_clusters(emergency=True)
-        
+
         # Call original handler if it exists
         original_handler = self._original_handlers.get(signum)
         if original_handler and callable(original_handler):
@@ -247,7 +249,7 @@ class ClusterCleanupManager:
                 original_handler(signum, frame)
             except Exception as e:
                 logger.error(f"Error calling original signal handler: {e}")
-        
+
         # For SIGINT, we might want to exit after cleanup
         if signum == signal.SIGINT:
             logger.info("Exiting after cleanup due to interrupt")
@@ -261,7 +263,7 @@ class ClusterCleanupManager:
     def register_cluster(self, cluster: KindCluster) -> None:
         """
         Register a cluster for cleanup tracking.
-        
+
         Args:
             cluster: KindCluster instance to track
         """
@@ -273,7 +275,7 @@ class ClusterCleanupManager:
     def unregister_cluster(self, cluster: KindCluster) -> None:
         """
         Unregister a cluster from cleanup tracking.
-        
+
         Args:
             cluster: KindCluster instance to stop tracking
         """
@@ -286,11 +288,11 @@ class ClusterCleanupManager:
     def cleanup_cluster(self, cluster: KindCluster, force: bool = False) -> bool:
         """
         Clean up a specific cluster.
-        
+
         Args:
             cluster: Cluster to clean up
             force: Force cleanup even if keep_cluster is True
-            
+
         Returns:
             True if cleanup was successful, False otherwise
         """
@@ -298,7 +300,7 @@ class ClusterCleanupManager:
             logger.info(f"Keeping cluster {cluster.name} (keep_cluster=True)")
             self.unregister_cluster(cluster)
             return True
-        
+
         try:
             logger.info(f"Cleaning up cluster: {cluster.name}")
             cluster.delete()
@@ -311,7 +313,7 @@ class ClusterCleanupManager:
     def _cleanup_all_clusters(self, emergency: bool = False) -> None:
         """
         Clean up all registered clusters.
-        
+
         Args:
             emergency: Whether this is an emergency cleanup (ignore keep_cluster)
         """
@@ -319,17 +321,17 @@ class ClusterCleanupManager:
             if self._cleanup_in_progress:
                 logger.debug("Cleanup already in progress, skipping")
                 return
-            
+
             self._cleanup_in_progress = True
-        
+
         try:
             clusters_to_cleanup = list(self._clusters.values())
             if not clusters_to_cleanup:
                 logger.debug("No clusters to cleanup")
                 return
-            
+
             logger.info(f"Cleaning up {len(clusters_to_cleanup)} clusters...")
-            
+
             cleanup_results = []
             for cluster in clusters_to_cleanup:
                 try:
@@ -339,26 +341,30 @@ class ClusterCleanupManager:
                 except Exception as e:
                     logger.error(f"Error during cleanup of {cluster.name}: {e}")
                     cleanup_results.append((cluster.name, False))
-            
+
             # Log summary
             successful = sum(1 for _, success in cleanup_results if success)
             total = len(cleanup_results)
-            logger.info(f"Cleanup completed: {successful}/{total} clusters cleaned up successfully")
-            
+            logger.info(
+                f"Cleanup completed: {successful}/{total} clusters cleaned up successfully"
+            )
+
             if successful < total:
-                failed_clusters = [name for name, success in cleanup_results if not success]
+                failed_clusters = [
+                    name for name, success in cleanup_results if not success
+                ]
                 logger.warning(f"Failed to cleanup clusters: {failed_clusters}")
-        
+
         except Exception as e:
             logger.error(f"Error during cluster cleanup: {e}")
-        
+
         finally:
             self._cleanup_in_progress = False
 
     def get_active_clusters(self) -> Set[str]:
         """
         Get set of currently active cluster names.
-        
+
         Returns:
             Set of active cluster names
         """
@@ -371,7 +377,7 @@ class ClusterCleanupManager:
         self._cleanup_all_clusters(emergency=True)
 
     @classmethod
-    def get_instance(cls) -> 'ClusterCleanupManager':
+    def get_instance(cls) -> "ClusterCleanupManager":
         """Get the singleton instance of the cleanup manager."""
         return cls()
 
@@ -379,15 +385,19 @@ class ClusterCleanupManager:
 class ClusterContext:
     """
     Context manager for guaranteed cluster cleanup.
-    
+
     This context manager ensures that clusters are cleaned up even if
     exceptions occur during test execution.
     """
 
-    def __init__(self, cluster: KindCluster, cleanup_manager: Optional[ClusterCleanupManager] = None):
+    def __init__(
+        self,
+        cluster: KindCluster,
+        cleanup_manager: Optional[ClusterCleanupManager] = None,
+    ):
         """
         Initialize the cluster context.
-        
+
         Args:
             cluster: Cluster to manage
             cleanup_manager: Cleanup manager to use (creates one if None)

@@ -154,7 +154,7 @@ class ClusterConfig:
         """
         default_scope = pytest_config.getoption("k8s_cluster_scope", "session")
         default_timeout = pytest_config.getoption("k8s_cluster_timeout", 300)
-        
+
         # Handle conflicting keep cluster options
         default_keep_cluster = pytest_config.getoption("k8s_cluster_keep", False)
         if pytest_config.getoption("k8s_no_cluster_keep", False):

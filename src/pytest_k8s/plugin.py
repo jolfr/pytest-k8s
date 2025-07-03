@@ -13,7 +13,6 @@ from .cleanup import get_cleanup_manager
 # Import fixtures to make them available
 
 
-
 def pytest_addoption(parser: pytest.Parser) -> None:
     """
     Add command-line options for the pytest-k8s plugin.
@@ -192,8 +191,9 @@ def pytest_keyboard_interrupt(excinfo) -> None:
         excinfo: Exception info for the keyboard interrupt
     """
     import logging
+
     logger = logging.getLogger(__name__)
-    
+
     logger.info("Keyboard interrupt received, cleaning up clusters...")
     cleanup_manager = get_cleanup_manager()
     cleanup_manager.force_cleanup_all()
@@ -209,8 +209,9 @@ def pytest_internalerror(excrepr, excinfo) -> None:
         excinfo: Exception info
     """
     import logging
+
     logger = logging.getLogger(__name__)
-    
+
     logger.error("Internal pytest error occurred, cleaning up clusters...")
     cleanup_manager = get_cleanup_manager()
     cleanup_manager.force_cleanup_all()

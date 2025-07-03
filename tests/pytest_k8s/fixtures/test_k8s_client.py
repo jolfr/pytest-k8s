@@ -240,7 +240,7 @@ class TestClientFixtureIntegration:
         with patch("kubernetes.config.load_kube_config"):
             # Create client directly to test the class behavior
             client = KubernetesClient(mock_cluster)
-            
+
             # The client should have been created and should work
             assert client is not None
             assert client.cluster is not None
@@ -259,7 +259,7 @@ class TestClientFixtureIntegration:
 
         with patch("kubernetes.config.load_kube_config"):
             client = KubernetesClient(mock_cluster)
-            
+
             assert client is not None
             assert client.cluster is mock_cluster
             assert client.cluster.name == "relationship-test-cluster"
@@ -273,7 +273,7 @@ class TestClientFixtureIntegration:
 
         with patch("kubernetes.config.load_kube_config"):
             client = KubernetesClient(mock_cluster)
-            
+
             assert client is not None
             assert client.cluster is not None
             assert client.cluster.name == "custom-config-cluster"

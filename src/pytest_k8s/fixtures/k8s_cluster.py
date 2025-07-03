@@ -307,7 +307,7 @@ def k8s_cluster(request):
     try:
         # Create the cluster
         cluster = _fixture_manager.create_cluster(scope=effective_scope, **params)
-        
+
         # Register with the robust cleanup manager
         cleanup_manager.register_cluster(cluster)
 

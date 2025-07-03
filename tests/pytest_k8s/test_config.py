@@ -487,9 +487,7 @@ class TestPluginIntegration:
                 assert config.cluster.default_keep_cluster is False
         """)
 
-        result = pytester.runpytest(
-            "--k8s-cluster-keep", "--k8s-no-cluster-keep", "-v"
-        )
+        result = pytester.runpytest("--k8s-cluster-keep", "--k8s-no-cluster-keep", "-v")
         assert result.ret == 0
 
     def test_cluster_scope_option(self, pytester):
@@ -521,6 +519,6 @@ class TestPluginIntegration:
             "--k8s-cluster-scope=module",
             "--k8s-cluster-timeout=900",
             "--k8s-cluster-keep",
-            "-v"
+            "-v",
         )
         assert result.ret == 0

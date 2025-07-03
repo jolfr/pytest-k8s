@@ -11,7 +11,6 @@ import pytest
 from unittest.mock import Mock, patch
 
 
-
 class TestClusterClientIntegration:
     """Test integration between k8s_cluster and k8s_client fixtures."""
 
