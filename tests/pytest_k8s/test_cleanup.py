@@ -197,16 +197,32 @@ class TestClusterCleanupManager:
 
         manager._clusters["signal-test-cluster"] = mock_cluster
 
+        # Mock the original handler to prevent it from being called
+        manager._original_handlers[signal.SIGINT] = None
+
         with patch.object(manager, "_cleanup_all_clusters") as mock_cleanup:
-            # Simulate signal handler call
-            manager._signal_handler(signal.SIGINT, None)
-            mock_cleanup.assert_called_once_with(emergency=True)
+            # Mock os._exit to prevent actual process termination
+            with patch("os._exit") as mock_exit:
+                # Simulate signal handler call
+                manager._signal_handler(signal.SIGINT, None)
+                mock_cleanup.assert_called_once_with(emergency=True)
+                # Verify that os._exit was called with status 1 for SIGINT
+                mock_exit.assert_called_once_with(1)
 
     def test_atexit_handler_registration(self):
         """Test that atexit handler is registered."""
-        with patch("atexit.register") as mock_atexit:
-            manager = ClusterCleanupManager()
-            mock_atexit.assert_called_with(manager._atexit_cleanup)
+        # Since ClusterCleanupManager is a singleton, we need to patch before the first instance
+        # Reset the singleton instance for this test
+        original_instance = ClusterCleanupManager._instance
+        ClusterCleanupManager._instance = None
+        
+        try:
+            with patch("atexit.register") as mock_atexit:
+                manager = ClusterCleanupManager()
+                mock_atexit.assert_called_with(manager._atexit_cleanup)
+        finally:
+            # Restore the original instance
+            ClusterCleanupManager._instance = original_instance
 
     def test_force_cleanup_all(self):
         """Test force cleanup of all clusters."""
@@ -340,15 +356,23 @@ class TestCleanupConfiguration:
 
     def test_cleanup_manager_handles_orphaned_clusters_on_init(self):
         """Test that cleanup manager handles orphaned clusters on initialization."""
-        with patch("pytest_k8s.cleanup.PersistentClusterTracker") as mock_tracker_class:
-            mock_tracker = Mock()
-            mock_tracker_class.return_value = mock_tracker
+        # Reset the singleton instance for this test
+        original_instance = ClusterCleanupManager._instance
+        ClusterCleanupManager._instance = None
+        
+        try:
+            with patch("pytest_k8s.cleanup.PersistentClusterTracker") as mock_tracker_class:
+                mock_tracker = Mock()
+                mock_tracker_class.return_value = mock_tracker
 
-            # Create new cleanup manager instance
-            ClusterCleanupManager()
+                # Create new cleanup manager instance
+                ClusterCleanupManager()
 
-            # Verify orphaned cleanup was attempted
-            mock_tracker.cleanup_orphaned_clusters.assert_called_once()
+                # Verify orphaned cleanup was attempted
+                mock_tracker.cleanup_orphaned_clusters.assert_called_once()
+        finally:
+            # Restore the original instance
+            ClusterCleanupManager._instance = original_instance
 
     def test_cleanup_manager_handles_orphaned_cleanup_errors(self):
         """Test that cleanup manager handles errors during orphaned cleanup."""
