@@ -91,7 +91,6 @@ jobs:
       contents: write
     outputs:
       new_release_version: ${{ steps.cz.outputs.version }}
-      artifacts_url: ${{steps.release.outputs.upload_url}}
       
     steps:
       - name: Check out
@@ -116,6 +115,12 @@ jobs:
       - name: Build Library
         run: uv build
       
+      - name: Upload build artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: python-package-distributions
+          path: dist/
+      
       - id: release
         name: Release to GitHub
         uses: ncipollo/release-action@v1
@@ -139,22 +144,11 @@ jobs:
       url: https://pypi.org/p/pytest-k8s/
 
     steps:
-      - name: Download release assets
-        run: |
-          mkdir -p dist
-          # Extract version from release tag (remove 'v' prefix)
-          VERSION="${{ needs.release.outputs.new_release_version }}"
-          
-          # Download wheel
-          curl -L -o "dist/pytest_k8s-${VERSION}-py3-none-any.whl" \
-            "${{ needs.release.outputs.artifacts_url }}/pytest_k8s-${VERSION}-py3-none-any.whl"
-          
-          # Download sdist
-          curl -L -o "dist/pytest_k8s-${VERSION}.tar.gz" \
-            "${{ needs.release.outputs.artifacts_url }}/pytest_k8s-${VERSION}.tar.gz"
-          
-          # List downloaded files
-          ls -la dist/
+      - name: Download build artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: python-package-distributions
+          path: dist/
 
       - name: Publish release distributions to PyPI
         uses: pypa/gh-action-pypi-publish@release/v1
