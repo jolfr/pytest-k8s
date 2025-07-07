@@ -80,6 +80,7 @@ jobs:
           uv run pytest -x
 
   release:
+    name: Release on GitHub
     runs-on: ubuntu-latest
     needs: [lint, test]
     concurrency:
