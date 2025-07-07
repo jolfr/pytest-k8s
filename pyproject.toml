@@ -42,3 +42,14 @@ dev = [
 
 [project.entry-points.pytest11]
 pytest_k8s = "pytest_k8s"
+
+[project.optional-dependencies]
+build = ["uv ~= 0.7.12"]
+
+[tool.semantic_release]
+build_command = """
+    python -m pip install -e '.[build]'
+    uv lock --upgrade-package "$PACKAGE_NAME"
+    git add uv.lock
+    uv build
+"""
