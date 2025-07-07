@@ -1,6 +1,6 @@
 [project]
 name = "pytest-k8s"
-version = "0.1.0"
+version = "1.0.0"
 description = "Kubernetes-based testing for pytest"
 readme = "README.md"
 authors = [
@@ -34,8 +34,17 @@ markers = [
     "integration: marks tests as integration tests",
 ]
 
+
+[tool.commitizen]
+name = "cz_conventional_commits"
+tag_format = "$version"
+version_scheme = "semver2"
+version_provider = "uv"
+update_changelog_on_bump = true
+
 [dependency-groups]
 dev = [
+    "pre-commit>=4.2.0",
     "pytest-cov>=6.2.1",
     "ruff>=0.12.1",
 ]
