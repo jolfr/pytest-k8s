@@ -1,6 +1,7 @@
 {
   "branches": ["main"],
   "plugins": [
+    "@covage/semantic-release-poetry-plugin",
     [
       "@semantic-release/commit-analyzer",
       {
