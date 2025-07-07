@@ -159,6 +159,8 @@ jobs:
           git_committer_email: "actions@users.noreply.github.com"
           changelog: true
           build: true
+          commit: true
+          push: true
           config_file: ".releaserc.json"
 
       - name: Publish | Upload to GitHub Release Assets
@@ -167,6 +169,7 @@ jobs:
         with:
           github_token: ${{ secrets.GITHUB_TOKEN }}
           tag: ${{ steps.release.outputs.tag }}
+          config_file: ".releaserc.json"
 
       - name: Upload | Distribution Artifacts
         uses: actions/upload-artifact@v4
