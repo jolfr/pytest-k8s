@@ -107,7 +107,7 @@ jobs:
         run: uv python install
 
       - id: cz
-        name: Create bump and changelog
+        name: Create Bump and Changelog
         uses: commitizen-tools/commitizen-action@master
         with:
           github_token: ${{ secrets.GITHUB_TOKEN }}
@@ -117,10 +117,12 @@ jobs:
         run: uv build
       
       - id: release
+        name: Release to GitHub
         uses: ncipollo/release-action@v1
         with:
           artifacts: "dist/*"
           bodyFile: "body.md"
+          tag: "v${{ steps.cz.outputs.version }}"
       
 
   pypi-publish:
