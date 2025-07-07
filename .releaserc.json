@@ -2,12 +2,6 @@
   "branches": ["main"],
   "plugins": [
     [
-      "@covage/semantic-release-poetry-plugin", 
-      {
-        "verifyConditions": false
-      }
-    ],
-    [
       "@semantic-release/commit-analyzer",
       {
         "preset": "conventionalcommits",
