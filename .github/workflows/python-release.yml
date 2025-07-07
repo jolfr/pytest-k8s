@@ -90,7 +90,6 @@ jobs:
     outputs:
       new_release_published: ${{ steps.semantic.outputs.new_release_published }}
       new_release_version: ${{ steps.semantic.outputs.new_release_version }}
-      new_release_name: pytest-k8s ${{ steps.semantic.outputs.new_release_version }}
       
     steps:
       - name: Checkout
@@ -177,7 +176,7 @@ jobs:
     # Dedicated environments with protections for publishing are strongly recommended.
     environment:
       name: pypi
-      url: https://pypi.org/project/pytest-k8s/${{ needs.release.outputs.new_release_name }}
+      url: https://pypi.org/p/pytest-k8s/
 
     steps:
       - name: Download release assets
