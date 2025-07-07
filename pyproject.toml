@@ -1,6 +1,6 @@
 [project]
 name = "pytest-k8s"
-version = "0.1.0"
+version = "1.0.0"
 description = "Kubernetes-based testing for pytest"
 readme = "README.md"
 authors = [
