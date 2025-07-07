@@ -87,6 +87,11 @@ jobs:
       contents: write
       issues: write
       pull-requests: write
+    outputs:
+      new_release_published: ${{ steps.semantic.outputs.new_release_published }}
+      new_release_version: ${{ steps.semantic.outputs.new_release_version }}
+      new_release_name: pytest-k8s ${{ steps.semantic.outputs.new_release_version }}
+      
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -159,3 +164,40 @@ jobs:
           asset_path: ./dist/pytest_k8s-${{ steps.semantic.outputs.new_release_version }}.tar.gz
           asset_name: pytest_k8s-${{ steps.semantic.outputs.new_release_version }}.tar.gz
           asset_content_type: application/gzip
+
+  pypi-publish:
+    name: Publish to PyPI
+    needs: [release]
+    runs-on: ubuntu-latest
+    if: needs.release.outputs.new_release_published == 'true'
+    permissions:
+      # IMPORTANT: this permission is mandatory for trusted publishing to PyPI
+      id-token: write
+
+    # Dedicated environments with protections for publishing are strongly recommended.
+    environment:
+      name: pypi
+      url: https://pypi.org/project/pytest-k8s/${{ needs.release.outputs.new_release_name }}
+
+    steps:
+      - name: Download release assets
+        run: |
+          mkdir -p dist
+          # Extract version from release tag (remove 'v' prefix)
+          VERSION="${{ needs.release.outputs.new_release_version }}"
+          
+          # Download wheel
+          curl -L -o "dist/pytest_k8s-${VERSION}-py3-none-any.whl" \
+            "https://github.com/${{ github.repository }}/releases/download/v${VERSION}/pytest_k8s-${VERSION}-py3-none-any.whl"
+          
+          # Download sdist
+          curl -L -o "dist/pytest_k8s-${VERSION}.tar.gz" \
+            "https://github.com/${{ github.repository }}/releases/download/v${VERSION}/pytest_k8s-${VERSION}.tar.gz"
+          
+          # List downloaded files
+          ls -la dist/
+
+      - name: Publish release distributions to PyPI
+        uses: pypa/gh-action-pypi-publish@release/v1
+        with:
+          packages-dir: dist/
